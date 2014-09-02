@@ -9,9 +9,9 @@ import (
 	"math"
 	"runtime"
 
-	"github.com/conformal/btcscript"
-	"github.com/conformal/btcutil"
-	"github.com/conformal/btcwire"
+	"github.com/mably/btcscript"
+	"github.com/mably/btcutil"
+	"github.com/mably/btcwire"
 )
 
 // txValidateItem holds a transaction along with which input to validate.

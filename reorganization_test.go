@@ -13,9 +13,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/conformal/btcchain"
-	"github.com/conformal/btcutil"
-	"github.com/conformal/btcwire"
+	"github.com/mably/btcchain"
+	"github.com/mably/btcutil"
+	"github.com/mably/btcwire"
 )
 
 // TestReorganization loads a set of test blocks which force a chain
