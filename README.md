@@ -1,8 +1,8 @@
 btcchain
 ========
 
-[![Build Status](https://travis-ci.org/conformal/btcchain.png?branch=master)]
-(https://travis-ci.org/conformal/btcchain)
+[![Build Status](https://travis-ci.org/mably/btcchain.png?branch=master)]
+(https://travis-ci.org/mably/btcchain)
 
 Package btcchain implements bitcoin block handling and chain selection rules.
 The test coverage is currently only around 60%, but will be increasing over
