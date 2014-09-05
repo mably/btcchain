@@ -3,6 +3,7 @@ btcchain
 
 [![Build Status](https://travis-ci.org/mably/btcchain.png?branch=master)]
 (https://travis-ci.org/mably/btcchain)
+[![tip for next commit](http://peer4commit.com/projects/130.svg)](http://peer4commit.com/projects/130)
 
 Package btcchain implements bitcoin block handling and chain selection rules.
 The test coverage is currently only around 60%, but will be increasing over
