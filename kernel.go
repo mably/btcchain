@@ -17,36 +17,36 @@ import (
 
 const (
 	// Protocol switch time of v0.3 kernel protocol
-	nProtocolV03SwitchTime 		int64	= 1363800000
-	nProtocolV03TestSwitchTime	int64	= 1359781000
+	nProtocolV03SwitchTime      int64   = 1363800000
+	nProtocolV03TestSwitchTime  int64   = 1359781000
 	// Protocol switch time of v0.4 kernel protocol
-	nProtocolV04SwitchTime 		int64	= 1399300000
-	nProtocolV04TestSwitchTime 	int64 	= 1395700000
+	nProtocolV04SwitchTime      int64   = 1399300000
+	nProtocolV04TestSwitchTime  int64   = 1395700000
 	// TxDB upgrade time for v0.4 protocol
 	// Note: v0.4 upgrade does not require block chain re-download. However,
 	//       user must upgrade before the protocol switch deadline, otherwise
 	//       re-download of blockchain is required. The timestamp of upgrade
 	//       is recorded in transaction database to alert user of the requirement.
-	nProtocolV04UpgradeTime 	int64    = 0
+	nProtocolV04UpgradeTime     int64   = 0
 
 	// Modifier interval: time to elapse before new modifier is computed
 	// Set to 6-hour for production network and 20-minute for test network
-	nModifierInterval 			int64 	= 6 * 60 * 60
-	nModifierIntervalRatio 		int64 	= 3
-	StakeTargetSpacing    		int64  	= 10 * 60 // 10 minutes
-	StakeMinAge 				int64 	= 60 * 60 * 24 * 30 // minimum age for coin age
-	StakeMaxAge					int64	= 60 * 60 * 24 * 90 // stake age of full weight
-	COIN 						int64 	= 1000000; // util.h
-	MaxClockDrift				int64  	= 2 * 60 * 60; // two hours (main.h)
+	nModifierInterval           int64   = 6 * 60 * 60
+	nModifierIntervalRatio      int64   = 3
+	StakeTargetSpacing          int64   = 10 * 60 // 10 minutes
+	StakeMinAge                 int64   = 60 * 60 * 24 * 30 // minimum age for coin age
+	StakeMaxAge                 int64   = 60 * 60 * 24 * 90 // stake age of full weight
+	COIN                        int64   = 1000000; // util.h
+	MaxClockDrift               int64   = 2 * 60 * 60; // two hours (main.h)
 )
 
 var (
 	// Hard checkpoints of stake modifiers to ensure they are deterministic
 	mapStakeModifierCheckpoints map[int32]uint32	= map[int32]uint32 {
-			0: uint32(0x0e00670b),
-			19080: uint32(0xad4e4d29),
-			30583: uint32(0xdc7bf136),
-			99999: uint32(0xf555cfd2),
+		0: uint32(0x0e00670b),
+		19080: uint32(0xad4e4d29),
+		30583: uint32(0xdc7bf136),
+		99999: uint32(0xf555cfd2),
 	}
 )
 
@@ -407,7 +407,7 @@ func (b *BlockChain) GetKernelStakeModifier(
 //   quantities so as to generate blocks faster, degrading the system back into
 //   a proof-of-work situation.
 //
- func (b *BlockChain) CheckStakeKernelHash(
+func (b *BlockChain) CheckStakeKernelHash(
 	nBits uint32, blockFrom *btcutil.Block, nTxPrevOffset uint32,
 	txPrev *btcutil.Tx, prevout *btcwire.OutPoint, nTimeTx int64 ,
 	fPrintProofOfStake bool) (
