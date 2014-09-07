@@ -584,7 +584,8 @@ func (b *BlockChain) CheckProofOfStake(tx *btcutil.Tx, nBits uint32) (
 
 	fDebug := true
 	//nTxPrevOffset uint := txindex.pos.nTxPos - txindex.pos.nBlockPos
-	var nTxPrevOffset uint32 = 0 // TODO missing info here
+	prevBlockTxLoc, _ := prevBlock.TxLoc() // TODO not optimal way
+	var nTxPrevOffset uint32 = uint32(prevBlockTxLoc[txPrev.Index()].TxStart)
 	hashProofOfStake, success, err = b.CheckStakeKernelHash(
 		nBits, prevBlock, nTxPrevOffset, txPrev, &txin.PreviousOutpoint,
 		msgTx.Time.Unix(), fDebug)
