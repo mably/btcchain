@@ -13,6 +13,7 @@ import (
 
 	"github.com/mably/btcutil"
 	"github.com/mably/btcwire"
+	"github.com/mably/btcscript"
 )
 
 const (
@@ -449,10 +450,10 @@ func (b *BlockChain) CheckStakeKernelHash(
 	if (isProtocolV03(b, int64(nTimeTx))) {  // v0.3 protocol
 		var blockSha *btcwire.ShaHash
 		blockSha, err = blockFrom.Sha()
-		if (err != nil) { return }
+		if err != nil { return }
 		nStakeModifier, nStakeModifierHeight, nStakeModifierTime, err =
 			b.GetKernelStakeModifier(blockSha, fPrintProofOfStake)
-		if (err != nil) { return }
+		if err != nil { return }
 		//ss << nStakeModifier;
 		err = writeElement(buf, nStakeModifier)
 		if err != nil { return }
@@ -562,7 +563,8 @@ func (b *BlockChain) CheckProofOfStake(tx *btcutil.Tx, nBits uint32) (
 	}
 
 	// Verify signature
-	if (!verifySignature(txPrev, tx, 0, true, 0)) {
+	errVerif := verifySignature(txStore, txin, tx, 0, true, 0)
+	if errVerif != nil {
 		//return tx.DoS(100, error("CheckProofOfStake() : VerifySignature failed on coinstake %s", tx.Sha().String()))
 		err = fmt.Errorf("CheckProofOfStake() : VerifySignature failed on coinstake %s", tx.Sha().String())
 		return
@@ -683,10 +685,30 @@ func getAdjustedTime() int64 {
 	return time.Now().Unix()
 }
 
-func verifySignature(txPrev *btcutil.Tx, tx *btcutil.Tx,
-	nIn uint32, fValidatePayToScriptHash bool, nHashType int) bool {
-	// TODO
-	return true
+func verifySignature(txStore TxStore, txIn *btcwire.TxIn, tx *btcutil.Tx,
+	nIn uint32, fValidatePayToScriptHash bool, nHashType int) error {
+
+	// Setup the script validation flags.  Blocks created after the BIP0016
+	// activation time need to have the pay-to-script-hash checks enabled.
+	var flags btcscript.ScriptFlags
+	if fValidatePayToScriptHash {
+		flags |= btcscript.ScriptBip16
+	}
+
+	txValItems := make([]*txValidateItem, 0, 1)
+	txVI := &txValidateItem{
+		txInIndex: int(nIn),
+		txIn:      txIn,
+		tx:        tx,
+	}
+	txValItems = append(txValItems, txVI)
+
+	validator := newTxValidator(txStore, flags)
+	if err := validator.Validate(txValItems); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // writeElement writes the little endian representation of element to w.
