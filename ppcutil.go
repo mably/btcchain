@@ -6,17 +6,39 @@ package btcchain
 
 import (
 	"errors"
-	_ "fmt"
+	 "fmt"
 	"github.com/mably/btcutil"
 	"math/big"
-	"time"
+	_ "time"
+	_ "os"
 )
 
-func (b *BlockChain) AddToBlockIndex(block *btcutil.Block) (err error) {
+func (b *BlockChain) AddToBlockIndex(blockObj *btcutil.Block) (err error) {
+	blockHash,_ := blockObj.Sha()
+	
+	// Check for duplicate
+	have, _ := b.HaveBlock(blockHash)
+	if have {
+		return fmt.Errorf("AddToBlockIndex() : %v already exists", blockHash)
+	}
+	
+	prevNode, _ := b.getPrevNodeFromBlock(blockObj)
+	blockHeight := int64(0)
+	if prevNode != nil {
+		blockHeight = prevNode.height + 1
+	}
+	
+	// Create a new block node for the block and add it to the in-memory
+	// block chain (could be either a side chain or the main chain).
+	newNode := newBlockNode(&blockObj.MsgBlock().Header, blockHash, blockHeight)
+	if prevNode != nil {
+		newNode.parent = prevNode
+		newNode.height = blockHeight
+		newNode.workSum.Add(prevNode.workSum, newNode.workSum)
+	}
+	/*
 
-	/*hash := block.Sha()
-
-	  // Check for duplicate
+	  
 	  if mapBlockIndex.count(hash) {
 	      err = errors.New("AddToBlockIndex() : %s already exists", hash.ToString().substr(0,20).c_str())
 	      return
@@ -132,17 +154,12 @@ func getBlockTrust(block *btcutil.Block) *big.Int {
 	}
 }
 
-func IsProtocolV04(time time.Time) bool {
-	// TODO(kac-)
-	return true
-}
-
 // ppcoin: entropy bit for stake modifier if chosen by modifier
 func getStakeEntropyBit(b *BlockChain, block *btcutil.Block) uint32 {
 
 	var nEntropyBit uint32 = 0
 
-	if IsProtocolV04(block.MsgBlock().Header.Timestamp) {
+	if isProtocolV04(b, int64(block.MsgBlock().Header.Timestamp.Unix())) {
 		hash, _ := block.Sha()
 		nEntropyBit = uint32((ShaHashToBig(hash).Int64()) & 1) // last bit of block hash
 
