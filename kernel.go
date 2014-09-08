@@ -189,13 +189,13 @@ func selectBlockFromCandidates(
 		// is always favored over proof-of-work block. this is to preserve
 		// the energy efficiency property
 		if pindex.hashProofOfStake != nil {
-			tmp := new(big.Int).SetBytes(hashSelection.Bytes())
+			tmp := ShaHashToBig(&hashSelection)
 			hashSelection.SetBytes(tmp.Rsh(tmp, 32).Bytes())
 			//hashSelection >>= 32
 		}
 
-		var hashSelectionInt = new(big.Int).SetBytes(hashSelection.Bytes())
-		var hashBestInt = new(big.Int).SetBytes(hashBest.Bytes());
+		var hashSelectionInt = ShaHashToBig(&hashSelection)
+		var hashBestInt = ShaHashToBig(hashBest)
 
 		if fSelected && hashSelectionInt.Cmp(hashBestInt) == -1 {
 			hashBest = &hashSelection
@@ -504,7 +504,7 @@ func (b *BlockChain) CheckStakeKernelHash(
 	}
 
 	// Now check if proof-of-stake hash meets target protocol
-	hashProofOfStakeInt := new(big.Int).SetBytes(hashProofOfStake.Bytes())
+	hashProofOfStakeInt := ShaHashToBig(hashProofOfStake)
 	if hashProofOfStakeInt.Cmp(new(big.Int).Mul(bnCoinDayWeight, bnTargetPerCoinDay)) > 0 {
 		return
 	}
