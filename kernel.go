@@ -1,3 +1,6 @@
+// Copyright (c) 2014-2014 PPCD developers.
+// Use of this source code is governed by an ISC
+// license that can be found in the LICENSE file.
 
 package btcchain
 
@@ -695,7 +698,7 @@ func verifySignature(txStore TxStore, txIn *btcwire.TxIn, tx *btcutil.Tx,
 		flags |= btcscript.ScriptBip16
 	}
 
-	txValItems := make([]*txValidateItem, 0, 1)
+	txValItems := make([]*txValidateItem, 1, 1)
 	txVI := &txValidateItem{
 		txInIndex: int(nIn),
 		txIn:      txIn,

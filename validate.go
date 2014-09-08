@@ -926,6 +926,24 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block) er
 		}
 	}
 
+    // ppcoin: verify hash target and signature of coinstake tx
+    // TODO is it the best place to do that?
+	if block.MsgBlock().IsProofOfStake() {
+		tx, err := block.Tx(1)
+		if err != nil {
+			return err
+		}
+		hashProofOfStake, success, err :=
+			b.CheckProofOfStake(tx, block.MsgBlock().Header.Bits)
+		if err != nil {
+			return err
+		}
+		if success {
+			node.hashProofOfStake = hashProofOfStake
+			//block.SetHashProofOfStake(hashProofOfStake)
+		}
+	}
+
 	return nil
 }
 
