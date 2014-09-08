@@ -205,6 +205,23 @@ func (b *BlockChain) ProcessBlock(block *btcutil.Block, flags BehaviorFlags) (bo
 		}
 	}
 
+    // ppcoin: verify hash target and signature of coinstake tx
+    // TODO is it the best place to do that?
+	if block.MsgBlock().IsProofOfStake() {
+		tx, err := block.Tx(1)
+		if err != nil {
+			return false, err
+		}
+		hashProofOfStake, success, err :=
+			b.CheckProofOfStake(tx, block.MsgBlock().Header.Bits)
+		if err != nil {
+			return false, err // TODO create specific error rule
+		}
+		if success {
+			block.Meta().HashProofOfStake = *hashProofOfStake
+		}
+	}
+
 	// The block has passed all context independent checks and appears sane
 	// enough to potentially accept it into the block chain.
 	err = b.maybeAcceptBlock(block, flags)

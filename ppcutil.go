@@ -6,9 +6,8 @@ package btcchain
 
 import (
 	"errors"
-	_ "fmt"
+	"fmt"
 	"math/big"
-	_ "os"
 	"time"
 
 	"github.com/mably/btcutil"
@@ -29,77 +28,56 @@ const(
 	nProtocolV04UpgradeTime     int64   = 0
 )
 
-func (b *BlockChain) AddToBlockIndex(blockObj *btcutil.Block) (err error) {
+// AddToBlockIndex processes all ppcoin specific block meta data
+func (b *BlockChain) AddToBlockIndex(block *btcutil.Block) (err error) {
+
+	meta := block.Meta()
 
 	// ppcoin: compute chain trust score
-	var bnChainTrust *big.Int
-	blockTrust := getBlockTrust(blockObj)
+	blockTrust := getBlockTrust(block)
 	if err != nil {
-		bnChainTrust = blockTrust
+		meta.ChainTrust = *blockTrust
 	} else {
-		prevNode, _ := b.getPrevNodeFromBlock(blockObj)
-		bnChainTrust = new(big.Int).Add(prevNode.chainTrust, blockTrust)
+		prevNode, _ := b.getPrevNodeFromBlock(block)
+		meta.ChainTrust =
+			*new(big.Int).Add(&prevNode.meta.ChainTrust, blockTrust)
 	}
-	//block.SetChainTrust(bnChainTrust)
 
 	// ppcoin: compute stake entropy bit for stake modifier
-	/* kac-temp-off
-	if !block.SetStakeEntropyBit(GetStakeEntropyBit()) {
-		err = errors.New("AddToBlockIndex() : SetStakeEntropyBit() failed")
+	meta.StakeEntropyBit, err = getStakeEntropyBit(b, block)
+	if err != nil {
+		err = errors.New("AddToBlockIndex() : GetStakeEntropyBit() failed")
 		return
 	}
-	*/
-
-	// Not needed: done in checkConnectBlock (validate.go)
-	// ppcoin: record proof-of-stake hash value
-	/*if block.IsProofOfStake() {
-	    if !mapProofOfStake.count(hash) {
-	        err = errors.New("AddToBlockIndex() : hashProofOfStake not found in map")
-	        return
-	    }
-	    block.hashProofOfStake = mapProofOfStake[hash]
-	}*/
 
 	// ppcoin: compute stake modifier
 	var nStakeModifier uint64 = 0
 	var fGeneratedStakeModifier bool = false
 	nStakeModifier, fGeneratedStakeModifier, err =
-		b.ComputeNextStakeModifier(blockObj)
+		b.ComputeNextStakeModifier(block)
 	if err != nil {
 		err = errors.New("AddToBlockIndex() : ComputeNextStakeModifier() failed")
 		return
 	}
-	/* kac-temp-off
-	block.SetStakeModifier(nStakeModifier, fGeneratedStakeModifier)
-	block.nStakeModifierChecksum = GetStakeModifierChecksum(block)
-	if !CheckStakeModifierCheckpoints(block.nHeight, block.nStakeModifierChecksum) {
-		err = fmt.Errorf("AddToBlockIndex() : Rejected by stake modifier checkpoint height=%d, modifier=%d", block.Height(), nStakeModifier)
+
+	meta.StakeModifier = nStakeModifier
+	meta.GeneratedStakeModifier = fGeneratedStakeModifier
+	meta.StakeModifierChecksum, err = b.GetStakeModifierChecksum(block)
+	if err != nil {
+		err = errors.New("AddToBlockIndex() : GetStakeModifierChecksum() failed")
 		return
 	}
-	*/
+	if !b.CheckStakeModifierCheckpoints(block.Height(), meta.StakeModifierChecksum) {
+		err = fmt.Errorf("AddToBlockIndex() : Rejected by stake modifier checkpoint height=%d, modifier=%d", block.Height(), meta.StakeModifier)
+		return
+	}
 
-	// Add to mapBlockIndex
-	/*map<uint256, CBlockIndex*>::iterator mi =
-	mapBlockIndex.insert(make_pair(hash, block)).first
-	*/
 	/* kac-temp-off
 	if block.IsProofOfStake() {
-		setStakeSeen.insert(make_pair(block.prevoutStake, block.nStakeTime))
-	}
-	block.phashBlock = &((*mi).first)
-	*/
-	/* kac-temp-off
-	// New best
-	if block.bnChainTrust > bnBestChainTrust {
-		if !SetBestChain(txdb, block) {
-			return false
-		}
+		setStakeSeen.insert(make_pair(block.prevoutStake, block.nStakeTime)) // TODO later to prevent block flood
 	}
 	*/
 
-	_ = nStakeModifier
-	_ = fGeneratedStakeModifier
-	_ = bnChainTrust
 	return nil
 }
 
@@ -118,7 +96,7 @@ func getBlockTrust(block *btcutil.Block) *big.Int {
 }
 
 // ppcoin: entropy bit for stake modifier if chosen by modifier
-func getStakeEntropyBit(b *BlockChain, block *btcutil.Block) uint32 {
+func getStakeEntropyBit(b *BlockChain, block *btcutil.Block) (uint32, error) {
 
 	var nEntropyBit uint32 = 0
 
@@ -148,7 +126,7 @@ func getStakeEntropyBit(b *BlockChain, block *btcutil.Block) uint32 {
 		//    printf(" entropybit=%d\n", nEntropyBit)
 	}
 
-	return nEntropyBit
+	return nEntropyBit, nil
 }
 
 // Whether the given coinstake is subject to new v0.3 protocol
