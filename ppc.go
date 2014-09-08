@@ -19,13 +19,6 @@ const (
 
 var ZeroSha = btcwire.ShaHash{}
 
-func MinInt(a int64, b int64) int64 {
-	if a < b {
-		return a
-	}
-	return b
-}
-
 // https://github.com/ppcoin/ppcoin/blob/v0.4.0ppc/src/main.cpp#L894
 // ppcoin: find last block index up to pindex
 func (b *BlockChain) GetLastBlockIndex(last *blockNode, proofOfStake bool) (block *blockNode) {
@@ -73,7 +66,7 @@ func (b *BlockChain) ppcCalcNextRequiredDifficulty(lastNode *blockNode, proofOfS
 	if proofOfStake {
 		targetSpacing = privStakeTargetSpacing
 	} else {
-		targetSpacing = MinInt(TargetSpacingWorkMax, privStakeTargetSpacing*(1+lastNode.height-prev.height))
+		targetSpacing = minInt64(TargetSpacingWorkMax, privStakeTargetSpacing*(1+lastNode.height-prev.height))
 	}
 	interval := TargetTimespan / targetSpacing
 	tmp := new(big.Int)

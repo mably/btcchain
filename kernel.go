@@ -12,7 +12,6 @@ import (
 	"io"
 	"math/big"
 	"sort"
-	"time"
 
 	"github.com/mably/btcutil"
 	"github.com/mably/btcwire"
@@ -20,18 +19,6 @@ import (
 )
 
 const (
-	// Protocol switch time of v0.3 kernel protocol
-	nProtocolV03SwitchTime      int64   = 1363800000
-	nProtocolV03TestSwitchTime  int64   = 1359781000
-	// Protocol switch time of v0.4 kernel protocol
-	nProtocolV04SwitchTime      int64   = 1399300000
-	nProtocolV04TestSwitchTime  int64   = 1395700000
-	// TxDB upgrade time for v0.4 protocol
-	// Note: v0.4 upgrade does not require block chain re-download. However,
-	//       user must upgrade before the protocol switch deadline, otherwise
-	//       re-download of blockchain is required. The timestamp of upgrade
-	//       is recorded in transaction database to alert user of the requirement.
-	nProtocolV04UpgradeTime     int64   = 0
 
 	// Modifier interval: time to elapse before new modifier is computed
 	// Set to 6-hour for production network and 20-minute for test network
@@ -77,28 +64,6 @@ func (s blockTimeHashSorter) Swap(i, j int) {
 // timestamp with index j.  It is part of the sort.Interface implementation.
 func (s blockTimeHashSorter) Less(i, j int) bool {
 	return s[i].time < s[j].time
-}
-
-// Whether the given coinstake is subject to new v0.3 protocol
-func isProtocolV03(b *BlockChain, nTimeCoinStake int64) bool {
-	var switchTime int64
-	if b.netParams.Name == "testnet3" {
-		switchTime = nProtocolV03TestSwitchTime
-	} else {
-		switchTime = nProtocolV03SwitchTime
-	}
-	return nTimeCoinStake >= switchTime
-}
-
-// Whether the given block is subject to new v0.4 protocol
-func isProtocolV04(b *BlockChain, nTimeBlock int64) bool {
-	var v04SwitchTime int64
-	if b.netParams.Name == "testnet3" {
-		v04SwitchTime = nProtocolV04TestSwitchTime
-	} else {
-		v04SwitchTime = nProtocolV04SwitchTime
-	}
-	return nTimeBlock >= v04SwitchTime
 }
 
 // Get the last stake modifier and its generation time from a given block
@@ -668,28 +633,6 @@ func (b *BlockChain) CheckStakeModifierCheckpoints(
 		return nStakeModifierChecksum == checkpoint
 	}
 	return true
-}
-
-func dateTimeStrFormat(t int64) string {
-	return time.Unix(t, 0).UTC().Format(time.RFC3339)
-}
-
-func minInt(a int, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-func minInt64(a int64, b int64) int64 {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-func getAdjustedTime() int64 {
-	return time.Now().Unix()
 }
 
 func verifySignature(txStore TxStore, txIn *btcwire.TxIn, tx *btcutil.Tx,

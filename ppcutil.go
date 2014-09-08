@@ -6,65 +6,38 @@ package btcchain
 
 import (
 	"errors"
-	 "fmt"
-	"github.com/mably/btcutil"
+	_ "fmt"
 	"math/big"
-	_ "time"
 	_ "os"
+	"time"
+
+	"github.com/mably/btcutil"
+)
+
+const(
+	// Protocol switch time of v0.3 kernel protocol
+	nProtocolV03SwitchTime      int64   = 1363800000
+	nProtocolV03TestSwitchTime  int64   = 1359781000
+	// Protocol switch time of v0.4 kernel protocol
+	nProtocolV04SwitchTime      int64   = 1399300000
+	nProtocolV04TestSwitchTime  int64   = 1395700000
+	// TxDB upgrade time for v0.4 protocol
+	// Note: v0.4 upgrade does not require block chain re-download. However,
+	//       user must upgrade before the protocol switch deadline, otherwise
+	//       re-download of blockchain is required. The timestamp of upgrade
+	//       is recorded in transaction database to alert user of the requirement.
+	nProtocolV04UpgradeTime     int64   = 0
 )
 
 func (b *BlockChain) AddToBlockIndex(blockObj *btcutil.Block) (err error) {
-	blockHash,_ := blockObj.Sha()
-	
-	// Check for duplicate
-	have, _ := b.HaveBlock(blockHash)
-	if have {
-		return fmt.Errorf("AddToBlockIndex() : %v already exists", blockHash)
-	}
-	
-	prevNode, _ := b.getPrevNodeFromBlock(blockObj)
-	blockHeight := int64(0)
-	if prevNode != nil {
-		blockHeight = prevNode.height + 1
-	}
-	
-	// Create a new block node for the block and add it to the in-memory
-	// block chain (could be either a side chain or the main chain).
-	newNode := newBlockNode(&blockObj.MsgBlock().Header, blockHash, blockHeight)
-	if prevNode != nil {
-		newNode.parent = prevNode
-		newNode.height = blockHeight
-		newNode.workSum.Add(prevNode.workSum, newNode.workSum)
-	}
-	/*
-
-	  
-	  if mapBlockIndex.count(hash) {
-	      err = errors.New("AddToBlockIndex() : %s already exists", hash.ToString().substr(0,20).c_str())
-	      return
-	  }
-
-	  // Construct new block index object
-	  CBlockIndex* block = new CBlockIndex(nFile, nBlockPos, *this)
-	  if !block {
-	      err = errors.New("AddToBlockIndex() : new CBlockIndex failed")
-	      return
-	  }
-
-	  block.phashBlock = &hash
-	  map<uint256, CBlockIndex*>::iterator miPrev = mapBlockIndex.find(hashPrevBlock)
-	  if miPrev != mapBlockIndex.end() {
-	      block.pprev = (*miPrev).second
-	      block.nHeight = block.pprev.nHeight + 1
-	  }*/
 
 	// ppcoin: compute chain trust score
 	var bnChainTrust *big.Int
-	blockTrust := getBlockTrust(block)
-	prevNode, err := b.getPrevNodeFromBlock(block)
+	blockTrust := getBlockTrust(blockObj)
 	if err != nil {
 		bnChainTrust = blockTrust
 	} else {
+		prevNode, _ := b.getPrevNodeFromBlock(blockObj)
 		bnChainTrust = new(big.Int).Add(prevNode.chainTrust, blockTrust)
 	}
 	//block.SetChainTrust(bnChainTrust)
@@ -91,7 +64,7 @@ func (b *BlockChain) AddToBlockIndex(blockObj *btcutil.Block) (err error) {
 	var nStakeModifier uint64 = 0
 	var fGeneratedStakeModifier bool = false
 	nStakeModifier, fGeneratedStakeModifier, err =
-		b.ComputeNextStakeModifier(block)
+		b.ComputeNextStakeModifier(blockObj)
 	if err != nil {
 		err = errors.New("AddToBlockIndex() : ComputeNextStakeModifier() failed")
 		return
@@ -113,16 +86,7 @@ func (b *BlockChain) AddToBlockIndex(blockObj *btcutil.Block) (err error) {
 	if block.IsProofOfStake() {
 		setStakeSeen.insert(make_pair(block.prevoutStake, block.nStakeTime))
 	}
-	*/
-	/*block.phashBlock = &((*mi).first)
-
-	  // Write to disk block index
-	  CTxDB txdb
-	  if (!txdb.TxnBegin())
-	      return false
-	  txdb.WriteBlockIndex(CDiskBlockIndex(block))
-	  if (!txdb.TxnCommit())
-	      return false
+	block.phashBlock = &((*mi).first)
 	*/
 	/* kac-temp-off
 	// New best
@@ -133,7 +97,6 @@ func (b *BlockChain) AddToBlockIndex(blockObj *btcutil.Block) (err error) {
 	}
 	*/
 
-	//txdb.Close()
 	_ = nStakeModifier
 	_ = fGeneratedStakeModifier
 	_ = bnChainTrust
@@ -186,4 +149,49 @@ func getStakeEntropyBit(b *BlockChain, block *btcutil.Block) uint32 {
 	}
 
 	return nEntropyBit
+}
+
+// Whether the given coinstake is subject to new v0.3 protocol
+func isProtocolV03(b *BlockChain, nTimeCoinStake int64) bool {
+	var switchTime int64
+	if b.netParams.Name == "testnet3" {
+		switchTime = nProtocolV03TestSwitchTime
+	} else {
+		switchTime = nProtocolV03SwitchTime
+	}
+	return nTimeCoinStake >= switchTime
+}
+
+// Whether the given block is subject to new v0.4 protocol
+func isProtocolV04(b *BlockChain, nTimeBlock int64) bool {
+	var v04SwitchTime int64
+	if b.netParams.Name == "testnet3" {
+		v04SwitchTime = nProtocolV04TestSwitchTime
+	} else {
+		v04SwitchTime = nProtocolV04SwitchTime
+	}
+	return nTimeBlock >= v04SwitchTime
+}
+
+// dateTimeStrFormat displays time in RFC3339 format
+func dateTimeStrFormat(t int64) string {
+	return time.Unix(t, 0).UTC().Format(time.RFC3339)
+}
+
+func minInt(a int, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func minInt64(a int64, b int64) int64 {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func getAdjustedTime() int64 {
+	return time.Now().Unix() // TODO differs from peercoin core, probably exists in btcd
 }
