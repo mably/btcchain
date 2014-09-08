@@ -45,7 +45,7 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, flags BehaviorFlags)
 		// the calculated difficulty based on the previous block and
 		// difficulty retarget rules.
 		expectedDifficulty, err := b.calcNextRequiredDifficulty(prevNode,
-			block.MsgBlock().Header.Timestamp)
+			block.MsgBlock().IsProofOfStake())
 		if err != nil {
 			return err
 		}
@@ -63,7 +63,9 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, flags BehaviorFlags)
 			log.Errorf("calcPastMedianTime: %v", err)
 			return err
 		}
-		if !blockHeader.Timestamp.After(medianTime) {
+		// TODO(kac-) check why
+		//if blockHeader.Timestamp.Before(medianTime) {
+		if blockHeader.Timestamp.Before(medianTime) {
 			str := "block timestamp of %v is not after expected %v"
 			str = fmt.Sprintf(str, blockHeader.Timestamp,
 				medianTime)

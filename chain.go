@@ -29,6 +29,9 @@ const (
 	// to determine when it's safe to prune nodes from memory without
 	// causing constant dynamic reloading.
 	minMemoryNodes = BlocksPerRetarget
+
+	// Peercion blockNode flags
+	FBlockProofOfStake = uint32(1 << 0)
 )
 
 // ErrIndexAlreadyInitialized describes an error that indicates the block index
@@ -75,12 +78,12 @@ type blockNode struct {
 	timestamp time.Time
 
 	// Peercoin specific
-	generatedStakeModifier 	bool
-	stakeModifier			uint64
-	stakeModifierChecksum	uint32 // checksum of index; in-memeory only (main.h)
-	hashProofOfStake		*btcwire.ShaHash
-	stakeEntropyBit			uint32
-	flags					uint32
+	generatedStakeModifier bool
+	stakeModifier          uint64
+	stakeModifierChecksum  uint32 // checksum of index; in-memeory only (main.h)
+	hashProofOfStake       *btcwire.ShaHash
+	stakeEntropyBit        uint32
+	flags                  uint32
 }
 
 // newBlockNode returns a new block node for the given block header.  It is
