@@ -81,6 +81,7 @@ type blockNode struct {
 	hashProofOfStake		*btcwire.ShaHash
 	stakeEntropyBit			uint32
 	flags					uint32
+	chainTrust				*big.Int
 }
 
 // newBlockNode returns a new block node for the given block header.  It is
