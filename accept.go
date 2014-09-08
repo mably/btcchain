@@ -44,7 +44,7 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, flags BehaviorFlags)
 		// Ensure the difficulty specified in the block header matches
 		// the calculated difficulty based on the previous block and
 		// difficulty retarget rules.
-		expectedDifficulty, err := b.calcNextRequiredDifficulty(prevNode,
+		expectedDifficulty, err := b.ppcCalcNextRequiredDifficulty(prevNode,
 			block.MsgBlock().IsProofOfStake())
 		if err != nil {
 			return err
@@ -158,7 +158,7 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, flags BehaviorFlags)
 
 	// Create a new block node for the block and add it to the in-memory
 	// block chain (could be either a side chain or the main chain).
-	newNode := newBlockNode(blockHeader, blockHash, blockHeight)
+	newNode := ppcNewBlockNode(blockHeader, blockHash, blockHeight, block.MsgBlock().IsProofOfStake())
 	if prevNode != nil {
 		newNode.parent = prevNode
 		newNode.height = blockHeight
