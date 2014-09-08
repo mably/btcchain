@@ -78,13 +78,13 @@ type blockNode struct {
 	timestamp time.Time
 
 	// Peercoin specific
-	generatedStakeModifier 	bool
-	stakeModifier			uint64
-	stakeModifierChecksum	uint32 // checksum of index; in-memeory only (main.h)
-	hashProofOfStake		*btcwire.ShaHash
-	stakeEntropyBit			uint32
-	flags					uint32
-	chainTrust				*big.Int
+	generatedStakeModifier  bool
+	stakeModifier           uint64
+	stakeModifierChecksum   uint32 // checksum of index (main.h)
+	hashProofOfStake        *btcwire.ShaHash
+	stakeEntropyBit         uint32
+	flags                   uint32
+	chainTrust              *big.Int
 }
 
 // newBlockNode returns a new block node for the given block header.  It is
