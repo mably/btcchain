@@ -78,13 +78,7 @@ type blockNode struct {
 	timestamp time.Time
 
 	// Peercoin specific
-	generatedStakeModifier  bool
-	stakeModifier           uint64
-	stakeModifierChecksum   uint32 // checksum of index (main.h)
-	hashProofOfStake        *btcwire.ShaHash
-	stakeEntropyBit         uint32
-	flags                   uint32
-	chainTrust              *big.Int
+	meta      *btcutil.Meta
 }
 
 // newBlockNode returns a new block node for the given block header.  It is
@@ -993,7 +987,9 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 
 	// We're extending (or creating) a side chain, but the cumulative
 	// work for this new side chain is not enough to make it the new chain.
-	if node.workSum.Cmp(b.bestChain.workSum) <= 0 {
+	//if node.workSum.Cmp(b.bestChain.workSum) <= 0 {
+	if node.meta.ChainTrust.Cmp(&b.bestChain.meta.ChainTrust) <= 0 { // TODO here ? ppcoin specific
+
 		// Skip Logging info when the dry run flag is set.
 		if dryRun {
 			return nil
