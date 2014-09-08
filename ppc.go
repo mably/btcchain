@@ -5,6 +5,7 @@
 package btcchain
 
 import (
+	"github.com/mably/btcutil"
 	"github.com/mably/btcwire"
 	"math/big"
 )
@@ -34,7 +35,7 @@ func (b *BlockChain) GetLastBlockIndex(last *blockNode, proofOfStake bool) (bloc
 		if block.parent == nil {
 			break
 		}
-		if (block.flags & FBlockProofOfStake) > 0 == proofOfStake {
+		if (block.meta.Flags & FBlockProofOfStake) > 0 == proofOfStake {
 			break
 		}
 		block = block.parent
@@ -119,7 +120,9 @@ func CalcTrust(bits uint32, proofOfStake bool) *big.Int {
 // completely disconnected from the chain and the workSum value is just the work
 // for the passed block.  The work sum is updated accordingly when the node is
 // inserted into a chain.
-func ppcNewBlockNode(blockHeader *btcwire.BlockHeader, blockSha *btcwire.ShaHash, height int64, proofOfStake bool) *blockNode {
+func ppcNewBlockNode(
+	blockHeader *btcwire.BlockHeader, blockSha *btcwire.ShaHash, height int64,
+	blockMeta *btcutil.Meta, proofOfStake bool) *blockNode {
 	// Make a copy of the hash so the node doesn't keep a reference to part
 	// of the full block/block header preventing it from being garbage
 	// collected.
@@ -132,6 +135,7 @@ func ppcNewBlockNode(blockHeader *btcwire.BlockHeader, blockSha *btcwire.ShaHash
 		version:    blockHeader.Version,
 		bits:       blockHeader.Bits,
 		timestamp:  blockHeader.Timestamp,
+		meta:       blockMeta,
 	}
 	return &node
 }

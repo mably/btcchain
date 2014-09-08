@@ -156,9 +156,17 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, flags BehaviorFlags)
 		}
 	}
 
+	// ppcoin: populate all ppcoin specific block meta data
+	err = b.AddToBlockIndex(block)
+	if err != nil {
+		return err
+	}
+
 	// Create a new block node for the block and add it to the in-memory
 	// block chain (could be either a side chain or the main chain).
-	newNode := ppcNewBlockNode(blockHeader, blockHash, blockHeight, block.MsgBlock().IsProofOfStake())
+	newNode := ppcNewBlockNode(
+		blockHeader, blockHash, blockHeight,
+		block.Meta(), block.MsgBlock().IsProofOfStake())
 	if prevNode != nil {
 		newNode.parent = prevNode
 		newNode.height = blockHeight

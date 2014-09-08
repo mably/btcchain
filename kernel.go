@@ -33,7 +33,7 @@ const (
 
 var (
 	// Hard checkpoints of stake modifiers to ensure they are deterministic
-	mapStakeModifierCheckpoints map[int32]uint32	= map[int32]uint32 {
+	mapStakeModifierCheckpoints map[int64]uint32	= map[int64]uint32 {
 		0: uint32(0x0e00670b),
 		19080: uint32(0xad4e4d29),
 		30583: uint32(0xdc7bf136),
@@ -74,15 +74,17 @@ func (b *BlockChain) GetLastStakeModifier(pindex *blockNode) (
 		err = errors.New("GetLastStakeModifier: nil pindex")
 		return
 	}
-	for (pindex.parentHash != nil && !pindex.generatedStakeModifier) {
+
+	for (pindex.parentHash != nil && !pindex.meta.GeneratedStakeModifier) {
 		pindex, err = b.getPrevNodeFromNode(pindex)
+		if err != nil { return }
 	}
-	if (!pindex.generatedStakeModifier) {
+	if (!pindex.meta.GeneratedStakeModifier) {
 		err = errors.New("GetLastStakeModifier: no generation at genesis block")
 		return
 	}
 
-	nStakeModifier = pindex.stakeModifier
+	nStakeModifier = pindex.meta.StakeModifier
 	nModifierTime = pindex.timestamp.Unix()
 	return
 }
@@ -131,43 +133,42 @@ func selectBlockFromCandidates(
 		// compute the selection hash by hashing its proof-hash and the
 		// previous proof-of-stake modifier
 		var hashProof *btcwire.ShaHash
-		if pindex.hashProofOfStake != nil {
-			hashProof = pindex.hashProofOfStake
+		if !pindex.meta.HashProofOfStake.IsEqual(&ZeroSha) { // TODO test null pointer in original code
+			hashProof = &pindex.meta.HashProofOfStake
 		} else {
 			hashProof = pindex.hash
 		}
 
+		/* ss << hashProof << nStakeModifierPrev */
 		buf := bytes.NewBuffer(make([]byte, 0,
 			btcwire.HashSize + btcwire.VarIntSerializeSize(nStakeModifierPrev)))
 		_, err = buf.Write(hashProof.Bytes())
 		if err != nil { return }
 		err = writeElement(buf, nStakeModifierPrev)
 		if err != nil { return }
-		var hashSelection btcwire.ShaHash
-		_ = hashSelection.SetBytes(btcwire.DoubleSha256(buf.Bytes()))
 
-		/*CDataStream ss(SER_GETHASH, 0);
-		ss << hashProof << nStakeModifierPrev;
-		uint256 hashSelection = Hash(ss.begin(), ss.end());*/
+		var hashSelection *btcwire.ShaHash
+		_ = hashSelection.SetBytes(btcwire.DoubleSha256(buf.Bytes()))
 
 		// the selection hash is divided by 2**32 so that proof-of-stake block
 		// is always favored over proof-of-work block. this is to preserve
 		// the energy efficiency property
-		if pindex.hashProofOfStake != nil {
-			tmp := ShaHashToBig(&hashSelection)
-			hashSelection.SetBytes(tmp.Rsh(tmp, 32).Bytes())
+		if !pindex.meta.HashProofOfStake.IsEqual(&ZeroSha) { // TODO test null pointer in original code
+			tmp := ShaHashToBig(hashSelection)
 			//hashSelection >>= 32
+			tmp = tmp.Rsh(tmp, 32)
+			hashSelection.SetBytes(tmp.Bytes()) // TODO BigEndian conversion?
 		}
 
-		var hashSelectionInt = ShaHashToBig(&hashSelection)
+		var hashSelectionInt = ShaHashToBig(hashSelection)
 		var hashBestInt = ShaHashToBig(hashBest)
 
 		if fSelected && hashSelectionInt.Cmp(hashBestInt) == -1 {
-			hashBest = &hashSelection
+			hashBest = hashSelection
 			pindexSelected = pindex
 		} else if !fSelected {
 			fSelected = true
-			hashBest = &hashSelection
+			hashBest = hashSelection
 			pindexSelected = pindex
 		}
 	}
@@ -256,23 +257,26 @@ func (b *BlockChain) ComputeNextStakeModifier(pindexCurrent *btcutil.Block) (
 	// Select 64 blocks from candidate blocks to generate stake modifier
 	var nStakeModifierNew uint64 = 0
 	var nSelectionIntervalStop int64 = nSelectionIntervalStart
-	var mapSelectedBlocks map[*btcwire.ShaHash]*blockNode = make(map[*btcwire.ShaHash]*blockNode)
+	var mapSelectedBlocks map[*btcwire.ShaHash]*blockNode =
+		make(map[*btcwire.ShaHash]*blockNode)
 	for nRound:=0; nRound<minInt(64, len(vSortedByTimestamp)); nRound++ {
 		// add an interval section to the current selection round
 		nSelectionIntervalStop += getStakeModifierSelectionIntervalSection(b, nRound);
 		// select a block from the candidates of current round
-		pindex, errSelBlk := selectBlockFromCandidates(b, vSortedByTimestamp, mapSelectedBlocks, nSelectionIntervalStop, nStakeModifier)
+		pindex, errSelBlk := selectBlockFromCandidates(b, vSortedByTimestamp,
+			mapSelectedBlocks, nSelectionIntervalStop, nStakeModifier)
 		if errSelBlk != nil {
 			err = fmt.Errorf("ComputeNextStakeModifier: unable to select block at round %d", nRound)
 			return
 		}
 		// write the entropy bit of the selected block
-		nStakeModifierNew |= (uint64(pindex.stakeEntropyBit) << uint64(nRound))
+		nStakeModifierNew |= (uint64(pindex.meta.StakeEntropyBit) << uint64(nRound))
 		// add the selected block from candidates to selected list
 		mapSelectedBlocks[pindex.hash] = pindex
 		//if (fDebug && GetBoolArg("-printstakemodifier")) {
 			log.Debugf("ComputeNextStakeModifier: selected round %d stop=%s height=%d bit=%d\n",
-				nRound, dateTimeStrFormat(nSelectionIntervalStop), pindex.height, pindex.stakeEntropyBit)
+				nRound, dateTimeStrFormat(nSelectionIntervalStop),
+				pindex.height, pindex.meta.StakeEntropyBit)
 		//}
 	}
 
@@ -308,10 +312,13 @@ func (b *BlockChain) ComputeNextStakeModifier(pindexCurrent *btcutil.Block) (
 		}
 		log.Debugf("ComputeNextStakeModifier: selection height [%d, %d] map %s\n", nHeightFirstCandidate, pindexPrev.Height(), strSelectionMap)
 	}*/
-	log.Debugf("ComputeNextStakeModifier: new modifier=%u time=%s\n", nStakeModifierNew, dateTimeStrFormat(pindexPrev.timestamp.Unix()))
+
+	log.Debugf("ComputeNextStakeModifier: new modifier=%u time=%s\n",
+		nStakeModifierNew, dateTimeStrFormat(pindexPrev.timestamp.Unix()))
 
 	nStakeModifier = nStakeModifierNew
 	fGeneratedStakeModifier = true
+
 	return
 }
 
@@ -344,12 +351,12 @@ func (b *BlockChain) GetKernelStakeModifier(
 			}
 		}
 		pindex = pindex.children[0]
-		if (pindex.generatedStakeModifier) {
+		if (pindex.meta.GeneratedStakeModifier) {
 			nStakeModifierHeight = int32(pindex.height)
 			nStakeModifierTime = pindex.timestamp.Unix()
 		}
 	}
-	nStakeModifier = pindex.stakeModifier
+	nStakeModifier = pindex.meta.StakeModifier
 	return
 }
 
@@ -585,28 +592,29 @@ func (b *BlockChain) CheckCoinStakeTimestamp(
 // Get stake modifier checksum
 // called from main.cpp
 func (b *BlockChain) GetStakeModifierChecksum(
-	pindex *blockNode) (checkSum uint32, err error) {
+	pindex *btcutil.Block) (checkSum uint32, err error) {
 
 	//assert (pindex.pprev || pindex.Sha().IsEqual(hashGenesisBlock))
 	// Hash previous checksum with flags, hashProofOfStake and nStakeModifier
 	buf := bytes.NewBuffer(make([]byte, 0, 1000)) // TODO calculate size
 	//CDataStream ss(SER_GETHASH, 0)
 	var parent *blockNode
-	parent, err = b.getPrevNodeFromNode(pindex)
+	parent, err = b.getPrevNodeFromBlock(pindex)
 	if parent != nil {
 		//ss << pindex.pprev.nStakeModifierChecksum
 		err = writeElement(
-			buf, parent.stakeModifierChecksum)
+			buf, parent.meta.StakeModifierChecksum)
 		if err != nil { return }
 	} else if err != nil {
 		return
 	}
+	meta := pindex.Meta()
 	//ss << pindex.nFlags << pindex.hashProofOfStake << pindex.nStakeModifier
-	err = writeElement(buf, pindex.flags)
+	err = writeElement(buf, meta.Flags)
 	if err != nil { return }
-	_, err = buf.Write(pindex.hashProofOfStake.Bytes())
+	_, err = buf.Write(meta.HashProofOfStake.Bytes())
 	if err != nil { return }
-	err = writeElement(buf, pindex.stakeModifier)
+	err = writeElement(buf, meta.StakeModifier)
 	if err != nil { return }
 
 	//uint256 hashChecksum = Hash(ss.begin(), ss.end())
@@ -625,7 +633,7 @@ func (b *BlockChain) GetStakeModifierChecksum(
 // Check stake modifier hard checkpoints
 // called from (main.cpp)
 func (b *BlockChain) CheckStakeModifierCheckpoints(
-	nHeight int32, nStakeModifierChecksum uint32) bool {
+	nHeight int64, nStakeModifierChecksum uint32) bool {
 	if b.netParams.Name == "testnet3" {
 		return true // Testnet has no checkpoints
 	}
