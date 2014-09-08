@@ -60,8 +60,8 @@ func (b *BlockChain) AddToBlockIndex(blockObj *btcutil.Block) (err error) {
 
 	// ppcoin: compute chain trust score
 	var bnChainTrust *big.Int
-	blockTrust := getBlockTrust(block)
-	prevNode, err := b.getPrevNodeFromBlock(block)
+	blockTrust := getBlockTrust(blockObj)
+	prevNode, err = b.getPrevNodeFromBlock(blockObj)
 	if err != nil {
 		bnChainTrust = blockTrust
 	} else {
@@ -91,7 +91,7 @@ func (b *BlockChain) AddToBlockIndex(blockObj *btcutil.Block) (err error) {
 	var nStakeModifier uint64 = 0
 	var fGeneratedStakeModifier bool = false
 	nStakeModifier, fGeneratedStakeModifier, err =
-		b.ComputeNextStakeModifier(block)
+		b.ComputeNextStakeModifier(blockObj)
 	if err != nil {
 		err = errors.New("AddToBlockIndex() : ComputeNextStakeModifier() failed")
 		return
