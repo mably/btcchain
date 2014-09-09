@@ -941,7 +941,8 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block) er
 func (b *BlockChain) CheckConnectBlock(block *btcutil.Block) error {
 	prevNode := b.bestChain
 	blockSha, _ := block.Sha()
-	newNode := newBlockNode(&block.MsgBlock().Header, blockSha, block.Height())
+	newNode := ppcNewBlockNode(
+		&block.MsgBlock().Header, blockSha, block.Height(), block.Meta())
 	if prevNode != nil {
 		newNode.parent = prevNode
 		newNode.workSum.Add(prevNode.workSum, newNode.workSum)
