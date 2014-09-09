@@ -75,13 +75,13 @@ func (b *BlockChain) GetLastStakeModifier(pindex *blockNode) (
 		return
 	}
 
-	for pindex.parentHash != nil && !pindex.meta.GeneratedStakeModifier {
+	for pindex.parentHash != nil && !IsGeneratedStakeModifier(pindex.meta) {
 		pindex, err = b.getPrevNodeFromNode(pindex)
 		if err != nil {
 			return
 		}
 	}
-	if !pindex.meta.GeneratedStakeModifier {
+	if !IsGeneratedStakeModifier(pindex.meta) {
 		err = errors.New("GetLastStakeModifier: no generation at genesis block")
 		return
 	}
@@ -280,13 +280,13 @@ func (b *BlockChain) ComputeNextStakeModifier(pindexCurrent *btcutil.Block) (
 			return
 		}
 		// write the entropy bit of the selected block
-		nStakeModifierNew |= (uint64(pindex.meta.StakeEntropyBit) << uint64(nRound))
+		nStakeModifierNew |= (uint64(GetStakeEntropyBit(pindex.meta)) << uint64(nRound))
 		// add the selected block from candidates to selected list
 		mapSelectedBlocks[pindex.hash] = pindex
 		//if (fDebug && GetBoolArg("-printstakemodifier")) {
 		log.Debugf("ComputeNextStakeModifier: selected round %d stop=%s height=%d bit=%d\n",
 			nRound, dateTimeStrFormat(nSelectionIntervalStop),
-			pindex.height, pindex.meta.StakeEntropyBit)
+			pindex.height, GetStakeEntropyBit(pindex.meta))
 		//}
 	}
 
@@ -361,7 +361,7 @@ func (b *BlockChain) GetKernelStakeModifier(
 			}
 		}
 		pindex = pindex.children[0]
-		if pindex.meta.GeneratedStakeModifier {
+		if IsGeneratedStakeModifier(pindex.meta) {
 			nStakeModifierHeight = int32(pindex.height)
 			nStakeModifierTime = pindex.timestamp.Unix()
 		}

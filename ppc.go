@@ -138,3 +138,33 @@ func ppcNewBlockNode(
 	}
 	return &node
 }
+
+func IsGeneratedStakeModifier(meta *btcutil.Meta) bool {
+	if meta.Flags&FBlockStakeModifier > 0 {
+		return true
+	}
+	return false
+}
+
+func SetGeneratedStakeModifier(meta *btcutil.Meta, generated bool) {
+	if generated {
+		meta.Flags |= FBlockStakeModifier
+	} else {
+		meta.Flags &^= FBlockStakeModifier
+	}
+}
+
+func GetStakeEntropyBit(meta *btcutil.Meta) uint32 {
+	if meta.Flags&FBlockStakeEntropy > 0 {
+		return 1
+	}
+	return 0
+}
+
+func SetStakeEntropyBit(meta *btcutil.Meta, entropyBit uint32) {
+	if entropyBit == 0 {
+		meta.Flags &^= FBlockStakeEntropy
+	} else {
+		meta.Flags |= FBlockStakeEntropy
+	}
+}

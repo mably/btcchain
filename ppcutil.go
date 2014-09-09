@@ -43,11 +43,12 @@ func (b *BlockChain) AddToBlockIndex(block *btcutil.Block) (err error) {
 	}
 
 	// ppcoin: compute stake entropy bit for stake modifier
-	meta.StakeEntropyBit, err = getStakeEntropyBit(b, block)
+	stakeEntropyBit, err := getStakeEntropyBit(b, block)
 	if err != nil {
 		err = errors.New("AddToBlockIndex() : GetStakeEntropyBit() failed")
 		return
 	}
+	SetStakeEntropyBit(meta, stakeEntropyBit)
 
 	// ppcoin: compute stake modifier
 	var nStakeModifier uint64 = 0
@@ -60,14 +61,7 @@ func (b *BlockChain) AddToBlockIndex(block *btcutil.Block) (err error) {
 	}
 
 	meta.StakeModifier = nStakeModifier
-	meta.GeneratedStakeModifier = fGeneratedStakeModifier
-	// TODO(kac-) GeneratedStakeModifier and StakeEntropyBit are Flags!
-	if meta.StakeEntropyBit != 0 {
-		meta.Flags |= FBlockStakeEntropy
-	}
-	if meta.GeneratedStakeModifier {
-		meta.Flags |= FBlockStakeModifier
-	}
+	SetGeneratedStakeModifier(meta, fGeneratedStakeModifier)
 
 	meta.StakeModifierChecksum, err = b.GetStakeModifierChecksum(block)
 	if err != nil {
