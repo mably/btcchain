@@ -75,24 +75,27 @@ func (b *BlockChain) GetLastStakeModifier(pindex *blockNode) (
 		return
 	}
 
-	for pindex.parentHash != nil && !IsGeneratedStakeModifier(pindex.meta) {
-		var parentHash = pindex.parentHash
+	for !pindex.parentHash.IsEqual(zeroHash) && !IsGeneratedStakeModifier(pindex.meta) {
 		pindex, err = b.getPrevNodeFromNode(pindex)
 		if err != nil {
 			return
 		}
-		if pindex == nil {
-			err = fmt.Errorf("GetLastStakeModifier: nil pindex for %s", parentHash)
+	}
+
+	// TODO is it the best way to do that?
+	if !IsGeneratedStakeModifier(pindex.meta) {
+		if pindex.hash.IsEqual(b.netParams.GenesisHash) {
+			pindex.meta.StakeModifier = 0
+			SetGeneratedStakeModifier(pindex.meta, true)
+		} else {
+			err = errors.New("GetLastStakeModifier: no generation at genesis block")
 			return
 		}
-	}
-	if !IsGeneratedStakeModifier(pindex.meta) {
-		err = errors.New("GetLastStakeModifier: no generation at genesis block")
-		return
 	}
 
 	nStakeModifier = pindex.meta.StakeModifier
 	nModifierTime = pindex.timestamp.Unix()
+
 	return
 }
 
@@ -212,6 +215,7 @@ func (b *BlockChain) ComputeNextStakeModifier(pindexCurrent *btcutil.Block) (
 	pindexPrev, errPrevNode := b.getPrevNodeFromBlock(pindexCurrent)
 	if errPrevNode != nil {
 		err = fmt.Errorf("fetching prev node: %v", errPrevNode)
+		return
 	}
 	if pindexPrev == nil {
 		fGeneratedStakeModifier = true
