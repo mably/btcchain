@@ -13,19 +13,19 @@ import (
 	"github.com/mably/btcutil"
 )
 
-const(
+const (
 	// Protocol switch time of v0.3 kernel protocol
-	nProtocolV03SwitchTime      int64   = 1363800000
-	nProtocolV03TestSwitchTime  int64   = 1359781000
+	nProtocolV03SwitchTime     int64 = 1363800000
+	nProtocolV03TestSwitchTime int64 = 1359781000
 	// Protocol switch time of v0.4 kernel protocol
-	nProtocolV04SwitchTime      int64   = 1399300000
-	nProtocolV04TestSwitchTime  int64   = 1395700000
+	nProtocolV04SwitchTime     int64 = 1399300000
+	nProtocolV04TestSwitchTime int64 = 1395700000
 	// TxDB upgrade time for v0.4 protocol
 	// Note: v0.4 upgrade does not require block chain re-download. However,
 	//       user must upgrade before the protocol switch deadline, otherwise
 	//       re-download of blockchain is required. The timestamp of upgrade
 	//       is recorded in transaction database to alert user of the requirement.
-	nProtocolV04UpgradeTime     int64   = 0
+	nProtocolV04UpgradeTime int64 = 0
 )
 
 // AddToBlockIndex processes all ppcoin specific block meta data
@@ -35,20 +35,20 @@ func (b *BlockChain) AddToBlockIndex(block *btcutil.Block) (err error) {
 
 	// ppcoin: compute chain trust score
 	blockTrust := getBlockTrust(block)
-	if err != nil {
-		meta.ChainTrust = *blockTrust
+	prevNode, err := b.getPrevNodeFromBlock(block)
+	if err != nil || prevNode == nil {
+		meta.ChainTrust.Set(blockTrust)
 	} else {
-		prevNode, _ := b.getPrevNodeFromBlock(block)
-		meta.ChainTrust =
-			*new(big.Int).Add(&prevNode.meta.ChainTrust, blockTrust)
+		meta.ChainTrust.Add(&prevNode.meta.ChainTrust, blockTrust)
 	}
 
 	// ppcoin: compute stake entropy bit for stake modifier
-	meta.StakeEntropyBit, err = getStakeEntropyBit(b, block)
+	stakeEntropyBit, err := getStakeEntropyBit(b, block)
 	if err != nil {
 		err = errors.New("AddToBlockIndex() : GetStakeEntropyBit() failed")
 		return
 	}
+	SetStakeEntropyBit(meta, stakeEntropyBit)
 
 	// ppcoin: compute stake modifier
 	var nStakeModifier uint64 = 0
@@ -56,12 +56,13 @@ func (b *BlockChain) AddToBlockIndex(block *btcutil.Block) (err error) {
 	nStakeModifier, fGeneratedStakeModifier, err =
 		b.ComputeNextStakeModifier(block)
 	if err != nil {
-		err = errors.New("AddToBlockIndex() : ComputeNextStakeModifier() failed")
+		err = fmt.Errorf("AddToBlockIndex() : ComputeNextStakeModifier() failed %v", err)
 		return
 	}
 
 	meta.StakeModifier = nStakeModifier
-	meta.GeneratedStakeModifier = fGeneratedStakeModifier
+	SetGeneratedStakeModifier(meta, fGeneratedStakeModifier)
+
 	meta.StakeModifierChecksum, err = b.GetStakeModifierChecksum(block)
 	if err != nil {
 		err = errors.New("AddToBlockIndex() : GetStakeModifierChecksum() failed")
@@ -82,17 +83,7 @@ func (b *BlockChain) AddToBlockIndex(block *btcutil.Block) (err error) {
 }
 
 func getBlockTrust(block *btcutil.Block) *big.Int {
-	nBits := block.MsgBlock().Header.Bits
-	bnTarget := CompactToBig(nBits)
-	tmp := new(big.Int)
-	if bnTarget.Cmp(big.NewInt(0)) <= 0 {
-		return tmp.SetInt64(0)
-	}
-	if block.MsgBlock().IsProofOfStake() {
-		return tmp.SetInt64(1).Lsh(tmp, 256).Div(tmp, bnTarget.Add(bnTarget, big.NewInt(1)))
-	} else {
-		return tmp.SetInt64(1)
-	}
+	return CalcTrust(block.MsgBlock().Header.Bits, block.MsgBlock().IsProofOfStake())
 }
 
 // ppcoin: entropy bit for stake modifier if chosen by modifier
