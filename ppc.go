@@ -140,10 +140,7 @@ func ppcNewBlockNode(
 }
 
 func IsGeneratedStakeModifier(meta *btcutil.Meta) bool {
-	if meta.Flags&FBlockStakeModifier > 0 {
-		return true
-	}
-	return false
+	return meta.Flags&FBlockStakeModifier != 0
 }
 
 func SetGeneratedStakeModifier(meta *btcutil.Meta, generated bool) {
