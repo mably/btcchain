@@ -3,14 +3,14 @@ package btcchain_test
 import (
 	"testing"
 
+	"compress/bzip2"
+	"encoding/binary"
+	"github.com/conformal/btclog"
 	"github.com/mably/btcchain"
 	"github.com/mably/btcdb"
 	"github.com/mably/btcnet"
 	"github.com/mably/btcutil"
 	"github.com/mably/btcwire"
-	//"github.com/conformal/btclog"
-	"compress/bzip2"
-	"encoding/binary"
 	"io"
 	"os"
 	"path/filepath"
@@ -24,7 +24,7 @@ func TestPPCProcessBlocks(t *testing.T) {
 		return
 	}
 	defer dbbc.Close()
-	//btcchain.SetLogWriter(os.Stdout, btclog.TraceLvl.String())
+	btcchain.SetLogWriter(os.Stdout, btclog.ErrorLvl.String())
 	bc := btcchain.New(dbbc, &btcnet.MainNetParams, nil)
 	blocks, _ := _loadBlocks(t, "blocks1-256.bz2")
 	for h, block := range blocks {
