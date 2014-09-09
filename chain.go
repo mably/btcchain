@@ -407,7 +407,7 @@ func (b *BlockChain) GenerateInitialIndex() error {
 // are needed to avoid needing to put the entire block chain in memory.
 func (b *BlockChain) loadBlockNode(hash *btcwire.ShaHash) (*blockNode, error) {
 	// Load the block header and height from the db.
-	blockHeader, err := b.db.FetchBlockHeaderBySha(hash)
+	blockHeader, blockMeta, err := b.db.FetchBlockHeaderMetaBySha(hash)
 	if err != nil {
 		return nil, err
 	}
@@ -417,7 +417,7 @@ func (b *BlockChain) loadBlockNode(hash *btcwire.ShaHash) (*blockNode, error) {
 	}
 
 	// Create the new block node for the block and set the work.
-	node := newBlockNode(blockHeader, hash, blockHeight)
+	node := ppcNewBlockNode(blockHeader, hash, blockHeight, blockMeta, proofOfStake) // TODO Peercoin specific
 	node.inMainChain = true
 
 	// Add the node to the chain.
