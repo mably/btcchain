@@ -13,28 +13,28 @@ import (
 	"math/big"
 	"sort"
 
+	"github.com/mably/btcscript"
 	"github.com/mably/btcutil"
 	"github.com/mably/btcwire"
-	"github.com/mably/btcscript"
 )
 
 const (
 
 	// Modifier interval: time to elapse before new modifier is computed
 	// Set to 6-hour for production network and 20-minute for test network
-	nModifierInterval           int64   = 6 * 60 * 60
-	nModifierIntervalRatio      int64   = 3
-	StakeTargetSpacing          int64   = 10 * 60 // 10 minutes
-	StakeMinAge                 int64   = 60 * 60 * 24 * 30 // minimum age for coin age
-	StakeMaxAge                 int64   = 60 * 60 * 24 * 90 // stake age of full weight
-	COIN                        int64   = 1000000; // util.h
-	MaxClockDrift               int64   = 2 * 60 * 60; // two hours (main.h)
+	nModifierInterval      int64 = 6 * 60 * 60
+	nModifierIntervalRatio int64 = 3
+	StakeTargetSpacing     int64 = 10 * 60           // 10 minutes
+	StakeMinAge            int64 = 60 * 60 * 24 * 30 // minimum age for coin age
+	StakeMaxAge            int64 = 60 * 60 * 24 * 90 // stake age of full weight
+	COIN                   int64 = 1000000           // util.h
+	MaxClockDrift          int64 = 2 * 60 * 60       // two hours (main.h)
 )
 
 var (
 	// Hard checkpoints of stake modifiers to ensure they are deterministic
-	mapStakeModifierCheckpoints map[int64]uint32	= map[int64]uint32 {
-		0: uint32(0x0e00670b),
+	mapStakeModifierCheckpoints map[int64]uint32 = map[int64]uint32{
+		0:     uint32(0x0e00670b),
 		19080: uint32(0xad4e4d29),
 		30583: uint32(0xdc7bf136),
 		99999: uint32(0xf555cfd2),
@@ -42,8 +42,8 @@ var (
 )
 
 type blockTimeHash struct {
-	time 	int64
-	hash 	*btcwire.ShaHash
+	time int64
+	hash *btcwire.ShaHash
 }
 
 type blockTimeHashSorter []blockTimeHash
@@ -70,16 +70,18 @@ func (s blockTimeHashSorter) Less(i, j int) bool {
 func (b *BlockChain) GetLastStakeModifier(pindex *blockNode) (
 	nStakeModifier uint64, nModifierTime int64, err error) {
 
-	if (pindex == nil) {
+	if pindex == nil {
 		err = errors.New("GetLastStakeModifier: nil pindex")
 		return
 	}
 
-	for (pindex.parentHash != nil && !pindex.meta.GeneratedStakeModifier) {
+	for pindex.parentHash != nil && !pindex.meta.GeneratedStakeModifier {
 		pindex, err = b.getPrevNodeFromNode(pindex)
-		if err != nil { return }
+		if err != nil {
+			return
+		}
 	}
-	if (!pindex.meta.GeneratedStakeModifier) {
+	if !pindex.meta.GeneratedStakeModifier {
 		err = errors.New("GetLastStakeModifier: no generation at genesis block")
 		return
 	}
@@ -98,7 +100,7 @@ func getStakeModifierSelectionIntervalSection(b *BlockChain, nSection int) int64
 // Get stake modifier selection interval (in seconds)
 func getStakeModifierSelectionInterval(b *BlockChain) int64 {
 	var nSelectionInterval int64 = 0
-	for nSection:=0; nSection<64; nSection++ {
+	for nSection := 0; nSection < 64; nSection++ {
 		nSelectionInterval += getStakeModifierSelectionIntervalSection(b, nSection)
 	}
 	return nSelectionInterval
@@ -113,13 +115,12 @@ func selectBlockFromCandidates(
 	nSelectionIntervalStop int64,
 	nStakeModifierPrev uint64) (pindexSelected *blockNode, err error) {
 
-	var hashBest *btcwire.ShaHash
+	var hashBest *btcwire.ShaHash = new(btcwire.ShaHash)
 	fSelected := false
 
 	for _, item := range vSortedByTimestamp {
-
-		pindex, errLoad := b.loadBlockNode(item.hash);
-		if  errLoad != nil {
+		pindex, errLoad := b.loadBlockNode(item.hash)
+		if errLoad != nil {
 			err = fmt.Errorf("SelectBlockFromCandidates: failed to find block index for candidate block %s", item.hash.String())
 			return
 		}
@@ -141,13 +142,17 @@ func selectBlockFromCandidates(
 
 		/* ss << hashProof << nStakeModifierPrev */
 		buf := bytes.NewBuffer(make([]byte, 0,
-			btcwire.HashSize + btcwire.VarIntSerializeSize(nStakeModifierPrev)))
+			btcwire.HashSize+btcwire.VarIntSerializeSize(nStakeModifierPrev)))
 		_, err = buf.Write(hashProof.Bytes())
-		if err != nil { return }
+		if err != nil {
+			return
+		}
 		err = writeElement(buf, nStakeModifierPrev)
-		if err != nil { return }
+		if err != nil {
+			return
+		}
 
-		var hashSelection *btcwire.ShaHash
+		var hashSelection *btcwire.ShaHash = new(btcwire.ShaHash)
 		_ = hashSelection.SetBytes(btcwire.DoubleSha256(buf.Bytes()))
 
 		// the selection hash is divided by 2**32 so that proof-of-stake block
@@ -173,7 +178,7 @@ func selectBlockFromCandidates(
 		}
 	}
 	//if fDebug && GetBoolArg("-printstakemodifier") {
-		log.Debugf("SelectBlockFromCandidates: selection hash=%s\n", hashBest.String())
+	log.Debugf("SelectBlockFromCandidates: selection hash=%s\n", hashBest.String())
 	//}
 	return
 }
@@ -201,6 +206,9 @@ func (b *BlockChain) ComputeNextStakeModifier(pindexCurrent *btcutil.Block) (
 	// if this is the genesis block.
 	pindexPrev, errPrevNode := b.getPrevNodeFromBlock(pindexCurrent)
 	if errPrevNode != nil {
+		err = fmt.Errorf("fetching prev node: %v", errPrevNode)
+	}
+	if pindexPrev == nil {
 		fGeneratedStakeModifier = true
 		return // genesis block's modifier is 0
 	}
@@ -210,7 +218,7 @@ func (b *BlockChain) ComputeNextStakeModifier(pindexCurrent *btcutil.Block) (
 	var nModifierTime int64 = 0
 	nStakeModifier, nModifierTime, stakeErr := b.GetLastStakeModifier(pindexPrev)
 	if stakeErr != nil {
-		err = errors.New("ComputeNextStakeModifier: unable to get last modifier");
+		err = fmt.Errorf("ComputeNextStakeModifier: unable to get last modifier: %v", stakeErr)
 		return
 	}
 
@@ -229,22 +237,25 @@ func (b *BlockChain) ComputeNextStakeModifier(pindexCurrent *btcutil.Block) (
 			return
 		} else {
 			currentSha, errSha := pindexCurrent.Sha()
-			if errSha != nil { err = errSha; return }
-			log.Debugf("ComputeNextStakeModifier: v0.3 modifier at block %s not meeting v0.4+ protocol: pindexCurrent nHeight=%d nTime=%u\n", currentSha.String(), pindexCurrent.Height(), pindexCurrentHeader.Timestamp.Unix());
+			if errSha != nil {
+				err = errSha
+				return
+			}
+			log.Debugf("ComputeNextStakeModifier: v0.3 modifier at block %s not meeting v0.4+ protocol: pindexCurrent nHeight=%d nTime=%u\n", currentSha.String(), pindexCurrent.Height(), pindexCurrentHeader.Timestamp.Unix())
 		}
 	}
 
 	// Sort candidate blocks by timestamp
-	var vSortedByTimestamp []blockTimeHash =
-		make([]blockTimeHash, 64 * nModifierInterval / StakeTargetSpacing)
+	// TODO(kac-) ouch
+	//var vSortedByTimestamp []blockTimeHash = make([]blockTimeHash, 64*nModifierInterval/StakeTargetSpacing)
+	var vSortedByTimestamp []blockTimeHash = make([]blockTimeHash, 0)
 	//vSortedByTimestamp.reserve(64 * nModifierInterval / STAKE_TARGET_SPACING)
 	var nSelectionInterval int64 = getStakeModifierSelectionInterval(b)
-	var nSelectionIntervalStart int64 =
-		(pindexPrev.timestamp.Unix() / nModifierInterval) * nModifierInterval - nSelectionInterval
+	var nSelectionIntervalStart int64 = (pindexPrev.timestamp.Unix()/nModifierInterval)*nModifierInterval - nSelectionInterval
 	var pindex *blockNode = pindexPrev
 	for pindex != nil && (pindex.timestamp.Unix() >= nSelectionIntervalStart) {
 		vSortedByTimestamp = append(vSortedByTimestamp,
-			blockTimeHash{ pindex.timestamp.Unix(), pindex.hash})
+			blockTimeHash{pindex.timestamp.Unix(), pindex.hash})
 		pindex, err = b.getPrevNodeFromNode(pindex)
 	}
 
@@ -257,16 +268,15 @@ func (b *BlockChain) ComputeNextStakeModifier(pindexCurrent *btcutil.Block) (
 	// Select 64 blocks from candidate blocks to generate stake modifier
 	var nStakeModifierNew uint64 = 0
 	var nSelectionIntervalStop int64 = nSelectionIntervalStart
-	var mapSelectedBlocks map[*btcwire.ShaHash]*blockNode =
-		make(map[*btcwire.ShaHash]*blockNode)
-	for nRound:=0; nRound<minInt(64, len(vSortedByTimestamp)); nRound++ {
+	var mapSelectedBlocks map[*btcwire.ShaHash]*blockNode = make(map[*btcwire.ShaHash]*blockNode)
+	for nRound := 0; nRound < minInt(64, len(vSortedByTimestamp)); nRound++ {
 		// add an interval section to the current selection round
-		nSelectionIntervalStop += getStakeModifierSelectionIntervalSection(b, nRound);
+		nSelectionIntervalStop += getStakeModifierSelectionIntervalSection(b, nRound)
 		// select a block from the candidates of current round
 		pindex, errSelBlk := selectBlockFromCandidates(b, vSortedByTimestamp,
 			mapSelectedBlocks, nSelectionIntervalStop, nStakeModifier)
 		if errSelBlk != nil {
-			err = fmt.Errorf("ComputeNextStakeModifier: unable to select block at round %d", nRound)
+			err = fmt.Errorf("ComputeNextStakeModifier: unable to select block at round %d : %v", nRound, errSelBlk)
 			return
 		}
 		// write the entropy bit of the selected block
@@ -274,44 +284,44 @@ func (b *BlockChain) ComputeNextStakeModifier(pindexCurrent *btcutil.Block) (
 		// add the selected block from candidates to selected list
 		mapSelectedBlocks[pindex.hash] = pindex
 		//if (fDebug && GetBoolArg("-printstakemodifier")) {
-			log.Debugf("ComputeNextStakeModifier: selected round %d stop=%s height=%d bit=%d\n",
-				nRound, dateTimeStrFormat(nSelectionIntervalStop),
-				pindex.height, pindex.meta.StakeEntropyBit)
+		log.Debugf("ComputeNextStakeModifier: selected round %d stop=%s height=%d bit=%d\n",
+			nRound, dateTimeStrFormat(nSelectionIntervalStop),
+			pindex.height, pindex.meta.StakeEntropyBit)
 		//}
 	}
 
 	// Print selection map for visualization of the selected blocks
 	/*
-	if (fDebug && GetBoolArg("-printstakemodifier")) {
-		var nHeightFirstCandidate int64
-		if pindex == nil {
-			nHeightFirstCandidate = 0
-		} else {
-			nHeightFirstCandidate = pindex.height + 1
-		}
-		strSelectionMap := ""
-		// '-' indicates proof-of-work blocks not selected
-		strSelectionMap.insert(0, pindexPrev.height - nHeightFirstCandidate + 1, '-')
-		pindex = pindexPrev
-		for pindex != nil && (pindex.height >= nHeightFirstCandidate) {
-			// '=' indicates proof-of-stake blocks not selected
-			if pindex.hashProofOfStake != nil {
-				strSelectionMap.replace(pindex.Height() - nHeightFirstCandidate, 1, "=")
-			}
-			pindex = pindex.pprev
-		}
-		for _, item := range mapSelectedBlocks {
-			// 'S' indicates selected proof-of-stake blocks
-			// 'W' indicates selected proof-of-work blocks
-			if IsBlockProofOfStake(item) {
-				blockType := "S"
+		if (fDebug && GetBoolArg("-printstakemodifier")) {
+			var nHeightFirstCandidate int64
+			if pindex == nil {
+				nHeightFirstCandidate = 0
 			} else {
-				blockType := "W"
+				nHeightFirstCandidate = pindex.height + 1
 			}
-			strSelectionMap.replace(item.Height() - nHeightFirstCandidate, 1,  blockType);
-		}
-		log.Debugf("ComputeNextStakeModifier: selection height [%d, %d] map %s\n", nHeightFirstCandidate, pindexPrev.Height(), strSelectionMap)
-	}*/
+			strSelectionMap := ""
+			// '-' indicates proof-of-work blocks not selected
+			strSelectionMap.insert(0, pindexPrev.height - nHeightFirstCandidate + 1, '-')
+			pindex = pindexPrev
+			for pindex != nil && (pindex.height >= nHeightFirstCandidate) {
+				// '=' indicates proof-of-stake blocks not selected
+				if pindex.hashProofOfStake != nil {
+					strSelectionMap.replace(pindex.Height() - nHeightFirstCandidate, 1, "=")
+				}
+				pindex = pindex.pprev
+			}
+			for _, item := range mapSelectedBlocks {
+				// 'S' indicates selected proof-of-stake blocks
+				// 'W' indicates selected proof-of-work blocks
+				if IsBlockProofOfStake(item) {
+					blockType := "S"
+				} else {
+					blockType := "W"
+				}
+				strSelectionMap.replace(item.Height() - nHeightFirstCandidate, 1,  blockType);
+			}
+			log.Debugf("ComputeNextStakeModifier: selection height [%d, %d] map %s\n", nHeightFirstCandidate, pindexPrev.Height(), strSelectionMap)
+		}*/
 
 	log.Debugf("ComputeNextStakeModifier: new modifier=%u time=%s\n",
 		nStakeModifierNew, dateTimeStrFormat(pindexPrev.timestamp.Unix()))
@@ -341,8 +351,8 @@ func (b *BlockChain) GetKernelStakeModifier(
 	var pindex *blockNode = pindexFrom
 	// loop to find the stake modifier later by a selection interval
 	for nStakeModifierTime < (pindexFrom.timestamp.Unix() + nStakeModifierSelectionInterval) {
-		if (len(pindex.children) == 0) {   // reached best block; may happen if node is behind on block chain
-			if (fPrintProofOfStake || (pindex.timestamp.Unix() + StakeMinAge - nStakeModifierSelectionInterval > getAdjustedTime())) {
+		if len(pindex.children) == 0 { // reached best block; may happen if node is behind on block chain
+			if fPrintProofOfStake || (pindex.timestamp.Unix()+StakeMinAge-nStakeModifierSelectionInterval > getAdjustedTime()) {
 				err = fmt.Errorf("GetKernelStakeModifier() : reached best block %s at height %d from block %s",
 					pindex.hash.String(), pindex.height, hashBlockFrom.String())
 				return
@@ -351,7 +361,7 @@ func (b *BlockChain) GetKernelStakeModifier(
 			}
 		}
 		pindex = pindex.children[0]
-		if (pindex.meta.GeneratedStakeModifier) {
+		if pindex.meta.GeneratedStakeModifier {
 			nStakeModifierHeight = int32(pindex.height)
 			nStakeModifierTime = pindex.timestamp.Unix()
 		}
@@ -385,20 +395,20 @@ func (b *BlockChain) GetKernelStakeModifier(
 //
 func (b *BlockChain) CheckStakeKernelHash(
 	nBits uint32, blockFrom *btcutil.Block, nTxPrevOffset uint32,
-	txPrev *btcutil.Tx, prevout *btcwire.OutPoint, nTimeTx int64 ,
+	txPrev *btcutil.Tx, prevout *btcwire.OutPoint, nTimeTx int64,
 	fPrintProofOfStake bool) (
 	hashProofOfStake *btcwire.ShaHash, success bool, err error) {
 
 	success = false
 
 	txMsgPrev := txPrev.MsgTx()
-	if (nTimeTx < txMsgPrev.Time.Unix())  { // Transaction timestamp violation
+	if nTimeTx < txMsgPrev.Time.Unix() { // Transaction timestamp violation
 		err = errors.New("CheckStakeKernelHash() : nTime violation")
 		return
 	}
 
 	var nTimeBlockFrom int64 = blockFrom.MsgBlock().Header.Timestamp.Unix()
-	if (nTimeBlockFrom + StakeMinAge > nTimeTx) { // Min age requirement
+	if nTimeBlockFrom+StakeMinAge > nTimeTx { // Min age requirement
 		err = errors.New("CheckStakeKernelHash() : min age violation")
 		return
 	}
@@ -410,11 +420,15 @@ func (b *BlockChain) CheckStakeKernelHash(
 	// this change increases active coins participating the hash and helps
 	// to secure the network when proof-of-stake difficulty is low
 	var timeDelta int64
-	if isProtocolV03(b, int64(nTimeTx)) { timeDelta = StakeMinAge } else { timeDelta = 0 }
-	var nTimeWeight int64 = minInt64(int64(nTimeTx) - txMsgPrev.Time.Unix(), int64(StakeMaxAge)) - timeDelta
+	if isProtocolV03(b, int64(nTimeTx)) {
+		timeDelta = StakeMinAge
+	} else {
+		timeDelta = 0
+	}
+	var nTimeWeight int64 = minInt64(int64(nTimeTx)-txMsgPrev.Time.Unix(), int64(StakeMaxAge)) - timeDelta
 	//CBigNum bnCoinDayWeight = CBigNum(nValueIn) * nTimeWeight / COIN / (24 * 60 * 60)
 	var bnCoinDayWeight *big.Int = new(big.Int).Mul(
-		big.NewInt(nValueIn), big.NewInt(nTimeWeight / COIN / 24 * 60 * 60))
+		big.NewInt(nValueIn), big.NewInt(nTimeWeight/COIN/24*60*60))
 
 	// Calculate hash
 	buf := bytes.NewBuffer(make([]byte, 0, 1000)) // TODO calculate size
@@ -422,39 +436,57 @@ func (b *BlockChain) CheckStakeKernelHash(
 	var nStakeModifier uint64
 	var nStakeModifierHeight int32
 	var nStakeModifierTime int64
-	if (isProtocolV03(b, int64(nTimeTx))) {  // v0.3 protocol
+	if isProtocolV03(b, int64(nTimeTx)) { // v0.3 protocol
 		var blockSha *btcwire.ShaHash
 		blockSha, err = blockFrom.Sha()
-		if err != nil { return }
+		if err != nil {
+			return
+		}
 		nStakeModifier, nStakeModifierHeight, nStakeModifierTime, err =
 			b.GetKernelStakeModifier(blockSha, fPrintProofOfStake)
-		if err != nil { return }
+		if err != nil {
+			return
+		}
 		//ss << nStakeModifier;
 		err = writeElement(buf, nStakeModifier)
-		if err != nil { return }
+		if err != nil {
+			return
+		}
 	} else { // v0.2 protocol
 		//ss << nBits;
 		err = writeElement(buf, nBits)
-		if err != nil { return }
+		if err != nil {
+			return
+		}
 	}
 
 	err = writeElement(buf, nTimeBlockFrom)
-	if err != nil { return }
+	if err != nil {
+		return
+	}
 	err = writeElement(buf, nTxPrevOffset)
-	if err != nil { return }
+	if err != nil {
+		return
+	}
 	err = writeElement(buf, txMsgPrev.Time.Unix())
-	if err != nil { return }
+	if err != nil {
+		return
+	}
 	err = writeElement(buf, prevout.Index)
-	if err != nil { return }
+	if err != nil {
+		return
+	}
 	err = writeElement(buf, nTimeTx)
-	if err != nil { return }
+	if err != nil {
+		return
+	}
 
 	//ss << nTimeBlockFrom << nTxPrevOffset << txPrev.nTime << prevout.n << nTimeTx;
 
 	//hashProofOfStake = Hash(ss.begin(), ss.end());
 	_ = hashProofOfStake.SetBytes(btcwire.DoubleSha256(buf.Bytes()))
 
-	if (fPrintProofOfStake) {
+	if fPrintProofOfStake {
 		if isProtocolV03(b, nTimeTx) {
 			log.Debugf("CheckStakeKernelHash() : using modifier %u at height=%d timestamp=%s for block from height=%d timestamp=%s\n",
 				nStakeModifier, nStakeModifierHeight,
@@ -471,8 +503,8 @@ func (b *BlockChain) CheckStakeKernelHash(
 			modifier = uint64(nBits)
 		}
 		log.Debugf("CheckStakeKernelHash() : check protocol=%s modifier=%u nTimeBlockFrom=%u nTxPrevOffset=%u nTimeTxPrev=%u nPrevout=%u nTimeTx=%u hashProof=%s\n",
-				ver, modifier, nTimeBlockFrom, nTxPrevOffset, txMsgPrev.Time.Unix(),
-				prevout.Index, nTimeTx, hashProofOfStake.String())
+			ver, modifier, nTimeBlockFrom, nTxPrevOffset, txMsgPrev.Time.Unix(),
+			prevout.Index, nTimeTx, hashProofOfStake.String())
 	}
 
 	// Now check if proof-of-stake hash meets target protocol
@@ -482,10 +514,10 @@ func (b *BlockChain) CheckStakeKernelHash(
 	}
 
 	//if (fDebug && !fPrintProofOfStake) {
-	if (!fPrintProofOfStake) {
+	if !fPrintProofOfStake {
 		if isProtocolV03(b, nTimeTx) {
 			log.Debugf("CheckStakeKernelHash() : using modifier %u at height=%d timestamp=%s for block from height=%d timestamp=%s\n",
-			nStakeModifier, nStakeModifierHeight,
+				nStakeModifier, nStakeModifierHeight,
 				dateTimeStrFormat(nStakeModifierTime), blockFrom.Height(),
 				dateTimeStrFormat(nTimeBlockFrom))
 		}
@@ -515,7 +547,7 @@ func (b *BlockChain) CheckProofOfStake(tx *btcutil.Tx, nBits uint32) (
 
 	msgTx := tx.MsgTx()
 
-	if (!msgTx.IsCoinStake()) {
+	if !msgTx.IsCoinStake() {
 		err = fmt.Errorf("CheckProofOfStake() : called on non-coinstake %s", tx.Sha().String())
 		return
 	}
@@ -525,7 +557,9 @@ func (b *BlockChain) CheckProofOfStake(tx *btcutil.Tx, nBits uint32) (
 
 	// First try finding the previous transaction in database
 	txStore, err := b.FetchTransactionStore(tx)
-	if err != nil { return }
+	if err != nil {
+		return
+	}
 	var txPrev *btcutil.Tx
 	var prevBlockHeight int64
 	if txPrevData, ok := txStore[txin.PreviousOutpoint.Hash]; ok {
@@ -566,11 +600,11 @@ func (b *BlockChain) CheckProofOfStake(tx *btcutil.Tx, nBits uint32) (
 	hashProofOfStake, success, err = b.CheckStakeKernelHash(
 		nBits, prevBlock, nTxPrevOffset, txPrev, &txin.PreviousOutpoint,
 		msgTx.Time.Unix(), fDebug)
-	if (!success) {
+	if !success {
 		//return tx.DoS(1, error("CheckProofOfStake() : INFO: check kernel failed on coinstake %s, hashProof=%s",
 		//		tx.Sha().String(), hashProofOfStake.String())) // may occur during initial download or if behind on block chain sync
 		err = fmt.Errorf("CheckProofOfStake() : INFO: check kernel failed on coinstake %s, hashProof=%s",
-				tx.Sha().String(), hashProofOfStake.String())
+			tx.Sha().String(), hashProofOfStake.String())
 		return
 	}
 
@@ -583,9 +617,9 @@ func (b *BlockChain) CheckCoinStakeTimestamp(
 	nTimeBlock int64, nTimeTx int64) bool {
 
 	if isProtocolV03(b, nTimeTx) { // v0.3 protocol
-		return (nTimeBlock == nTimeTx);
+		return (nTimeBlock == nTimeTx)
 	} else { // v0.2 protocol
-		return ((nTimeTx <= nTimeBlock) && (nTimeBlock <= nTimeTx + MaxClockDrift));
+		return ((nTimeTx <= nTimeBlock) && (nTimeBlock <= nTimeTx+MaxClockDrift))
 	}
 }
 
@@ -604,28 +638,38 @@ func (b *BlockChain) GetStakeModifierChecksum(
 		//ss << pindex.pprev.nStakeModifierChecksum
 		err = writeElement(
 			buf, parent.meta.StakeModifierChecksum)
-		if err != nil { return }
+		if err != nil {
+			return
+		}
 	} else if err != nil {
 		return
 	}
 	meta := pindex.Meta()
 	//ss << pindex.nFlags << pindex.hashProofOfStake << pindex.nStakeModifier
 	err = writeElement(buf, meta.Flags)
-	if err != nil { return }
+	if err != nil {
+		return
+	}
 	_, err = buf.Write(meta.HashProofOfStake.Bytes())
-	if err != nil { return }
+	if err != nil {
+		return
+	}
 	err = writeElement(buf, meta.StakeModifier)
-	if err != nil { return }
+	if err != nil {
+		return
+	}
 
 	//uint256 hashChecksum = Hash(ss.begin(), ss.end())
 	var hashChecksum *btcwire.ShaHash
 	hashChecksum, err = btcwire.NewShaHash(btcwire.DoubleSha256(buf.Bytes()))
-	if err != nil { return }
+	if err != nil {
+		return
+	}
 
 	//hashChecksum >>= (256 - 32)
 	var hashCheckSumInt = ShaHashToBig(hashChecksum)
 	//return hashChecksum.Get64()
-	checkSum = uint32(hashCheckSumInt.Rsh(hashCheckSumInt, 256 - 32).Uint64())
+	checkSum = uint32(hashCheckSumInt.Rsh(hashCheckSumInt, 256-32).Uint64())
 
 	return
 }

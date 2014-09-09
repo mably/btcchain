@@ -31,7 +31,9 @@ const (
 	minMemoryNodes = BlocksPerRetarget
 
 	// Peercion blockNode flags
-	FBlockProofOfStake = uint32(1 << 0)
+	FBlockProofOfStake  = uint32(1 << 0)
+	FBlockStakeEntropy  = uint32(1 << 1) // entropy bit for stake modifier
+	FBlockStakeModifier = uint32(1 << 2) // regenerated stake modifier
 )
 
 // ErrIndexAlreadyInitialized describes an error that indicates the block index
@@ -78,7 +80,7 @@ type blockNode struct {
 	timestamp time.Time
 
 	// Peercoin specific
-	meta      *btcutil.Meta
+	meta *btcutil.Meta
 }
 
 // newBlockNode returns a new block node for the given block header.  It is
@@ -407,17 +409,22 @@ func (b *BlockChain) GenerateInitialIndex() error {
 // are needed to avoid needing to put the entire block chain in memory.
 func (b *BlockChain) loadBlockNode(hash *btcwire.ShaHash) (*blockNode, error) {
 	// Load the block header and height from the db.
-	blockHeader, err := b.db.FetchBlockHeaderBySha(hash)
+
+	// TODO(kac-) OVERHEAD
+	// we need meta so we fetch whole block with meta and take meta
+	//blockHeader, err := b.db.FetchBlockHeaderBySha(hash)
+	block, err := b.db.FetchBlockBySha(hash)
 	if err != nil {
 		return nil, err
 	}
+	blockHeader := &block.MsgBlock().Header
+	meta := block.Meta()
 	blockHeight, err := b.db.FetchBlockHeightBySha(hash)
 	if err != nil {
 		return nil, err
 	}
-
 	// Create the new block node for the block and set the work.
-	node := newBlockNode(blockHeader, hash, blockHeight)
+	node := ppcNewBlockNode(blockHeader, hash, blockHeight, meta)
 	node.inMainChain = true
 
 	// Add the node to the chain.

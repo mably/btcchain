@@ -166,7 +166,7 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, flags BehaviorFlags)
 	// block chain (could be either a side chain or the main chain).
 	newNode := ppcNewBlockNode(
 		blockHeader, blockHash, blockHeight,
-		block.Meta(), block.MsgBlock().IsProofOfStake())
+		block.Meta())
 	if prevNode != nil {
 		newNode.parent = prevNode
 		newNode.height = blockHeight
