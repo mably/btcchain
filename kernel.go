@@ -76,8 +76,13 @@ func (b *BlockChain) GetLastStakeModifier(pindex *blockNode) (
 	}
 
 	for pindex.parentHash != nil && !IsGeneratedStakeModifier(pindex.meta) {
+		var parentHash = pindex.parentHash
 		pindex, err = b.getPrevNodeFromNode(pindex)
 		if err != nil {
+			return
+		}
+		if pindex == nil {
+			err = fmt.Errorf("GetLastStakeModifier: nil pindex for %s", parentHash)
 			return
 		}
 	}
