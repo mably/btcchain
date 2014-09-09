@@ -89,17 +89,7 @@ func (b *BlockChain) AddToBlockIndex(block *btcutil.Block) (err error) {
 }
 
 func getBlockTrust(block *btcutil.Block) *big.Int {
-	nBits := block.MsgBlock().Header.Bits
-	bnTarget := CompactToBig(nBits)
-	tmp := new(big.Int)
-	if bnTarget.Cmp(big.NewInt(0)) <= 0 {
-		return tmp.SetInt64(0)
-	}
-	if block.MsgBlock().IsProofOfStake() {
-		return tmp.SetInt64(1).Lsh(tmp, 256).Div(tmp, bnTarget.Add(bnTarget, big.NewInt(1)))
-	} else {
-		return tmp.SetInt64(1)
-	}
+	return CalcTrust(block.MsgBlock().Header.Bits, block.MsgBlock().IsProofOfStake())
 }
 
 // ppcoin: entropy bit for stake modifier if chosen by modifier
