@@ -169,18 +169,17 @@ func minInt64(a int64, b int64) int64 {
 }
 
 func getAdjustedTime() int64 {
-	return time.Now().Unix() // TODO differs from peercoin core, probably exists in btcd
+	return time.Now().Unix() // TODO differs from ppcoin, probably already exists in btcd
 }
 
 func now() time.Time {
-    return time.Now()
+    return btcutil.Now()
 }
 
 func timeTrack(start time.Time, name string) {
-    elapsed := time.Since(start)
-    log.Tracef("%s took %s", name, elapsed)
+    btcutil.TimeTrack(log, start, name)
 }
 
 func slice(args ...interface{}) []interface{} {
-    return args
+    return btcutil.Slice(args)
 }
