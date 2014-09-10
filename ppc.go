@@ -5,6 +5,7 @@
 package btcchain
 
 import (
+	"fmt"
 	"github.com/mably/btcutil"
 	"github.com/mably/btcwire"
 	"math/big"
@@ -23,6 +24,9 @@ var ZeroSha = btcwire.ShaHash{}
 // https://github.com/ppcoin/ppcoin/blob/v0.4.0ppc/src/main.cpp#L894
 // ppcoin: find last block index up to pindex
 func (b *BlockChain) GetLastBlockIndex(last *blockNode, proofOfStake bool) (block *blockNode) {
+
+	defer timeTrack(now(), fmt.Sprintf("GetLastBlockIndex(%v)", last.hash))
+
 	block = last
 	for true {
 		if block == nil {
@@ -50,6 +54,9 @@ func (b *BlockChain) GetLastBlockIndex(last *blockNode, proofOfStake bool) (bloc
 // while this function accepts any block node.
 // Peercoin https://github.com/ppcoin/ppcoin/blob/v0.4.0ppc/src/main.cpp#L902
 func (b *BlockChain) ppcCalcNextRequiredDifficulty(lastNode *blockNode, proofOfStake bool) (uint32, error) {
+
+	defer timeTrack(now(), fmt.Sprintf("ppcCalcNextRequiredDifficulty(%v)", lastNode.hash))
+
 	if lastNode == nil {
 		return b.netParams.PowLimitBits, nil // genesis block
 	}

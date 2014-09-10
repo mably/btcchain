@@ -758,6 +758,9 @@ func (b *BlockChain) getReorganizeNodes(node *blockNode) (*list.List, *list.List
 // connectBlock handles connecting the passed node/block to the end of the main
 // (best) chain.
 func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block) error {
+
+	defer timeTrack(now(), fmt.Sprintf("connectBlock(%v)", slice(block.Sha())[0]))
+
 	// Make sure it's extending the end of the best chain.
 	prevHash := &block.MsgBlock().Header.PrevBlock
 	if b.bestChain != nil && !prevHash.IsEqual(b.bestChain.hash) {
@@ -924,6 +927,9 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List, flags 
 //    state of the memory chain index.  Also, any log messages related to
 //    modifying the state are avoided.
 func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, flags BehaviorFlags) error {
+
+	defer timeTrack(now(), fmt.Sprintf("connectBestChain(%v)", slice(block.Sha())[0]))
+
 	fastAdd := flags&BFFastAdd == BFFastAdd
 	dryRun := flags&BFDryRun == BFDryRun
 

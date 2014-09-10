@@ -20,6 +20,9 @@ import (
 //  - BFDryRun: The memory chain index will not be pruned and no accept
 //    notification will be sent since the block is not being accepted.
 func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, flags BehaviorFlags) error {
+
+	defer timeTrack(now(), fmt.Sprintf("maybeAcceptBlock(%v)", slice(block.Sha())[0]))
+
 	fastAdd := flags&BFFastAdd == BFFastAdd
 	dryRun := flags&BFDryRun == BFDryRun
 
@@ -44,8 +47,8 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, flags BehaviorFlags)
 		// Ensure the difficulty specified in the block header matches
 		// the calculated difficulty based on the previous block and
 		// difficulty retarget rules.
-		expectedDifficulty, err := b.ppcCalcNextRequiredDifficulty(prevNode,
-			block.MsgBlock().IsProofOfStake())
+		expectedDifficulty, err := b.ppcCalcNextRequiredDifficulty(
+			prevNode, block.MsgBlock().IsProofOfStake())
 		if err != nil {
 			return err
 		}
@@ -67,8 +70,7 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, flags BehaviorFlags)
 		// !blockHeader.Timestamp.After(medianTime)
 		if blockHeader.Timestamp.Before(medianTime) {
 			str := "block timestamp of %v is not after expected %v"
-			str = fmt.Sprintf(str, blockHeader.Timestamp,
-				medianTime)
+			str = fmt.Sprintf(str, blockHeader.Timestamp, medianTime)
 			return ruleError(ErrTimeTooOld, str)
 		}
 
@@ -128,8 +130,7 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, flags BehaviorFlags)
 		// newer once a majority of the network has upgraded.  This is
 		// part of BIP0034.
 		if blockHeader.Version >= serializedHeightVersion {
-			if b.isMajorityVersion(serializedHeightVersion,
-				prevNode,
+			if b.isMajorityVersion(serializedHeightVersion, prevNode,
 				b.netParams.CoinbaseBlockHeightNumRequired,
 				b.netParams.CoinbaseBlockHeightNumToCheck) {
 
@@ -138,8 +139,7 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, flags BehaviorFlags)
 					expectedHeight = prevNode.height + 1
 				}
 				coinbaseTx := block.Transactions()[0]
-				err := checkSerializedHeight(coinbaseTx,
-					expectedHeight)
+				err := checkSerializedHeight(coinbaseTx, expectedHeight)
 				if err != nil {
 					return err
 				}

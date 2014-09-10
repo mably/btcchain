@@ -31,9 +31,11 @@ const (
 // AddToBlockIndex processes all ppcoin specific block meta data
 func (b *BlockChain) AddToBlockIndex(block *btcutil.Block) (err error) {
 
+	defer timeTrack(now(), fmt.Sprintf("AddToBlockIndex(%v)", slice(block.Sha())[0]))
+
 	meta := block.Meta()
 
-	// ppcoin: compute chain trust score
+	// ppcoin: compute chain trust score TODO needed here?
 	blockTrust := getBlockTrust(block)
 	prevNode, err := b.getPrevNodeFromBlock(block)
 	if err != nil || prevNode == nil {
@@ -89,10 +91,13 @@ func getBlockTrust(block *btcutil.Block) *big.Int {
 // ppcoin: entropy bit for stake modifier if chosen by modifier
 func getStakeEntropyBit(b *BlockChain, block *btcutil.Block) (uint32, error) {
 
+	defer timeTrack(now(), fmt.Sprintf("getStakeEntropyBit(%v)", slice(block.Sha())[0]))
+
 	var nEntropyBit uint32 = 0
+	hash, _ := block.Sha()
 
 	if isProtocolV04(b, int64(block.MsgBlock().Header.Timestamp.Unix())) {
-		hash, _ := block.Sha()
+
 		nEntropyBit = uint32((ShaHashToBig(hash).Int64()) & 1) // last bit of block hash
 
 		//if (fDebug && GetBoolArg("-printstakemodifier"))
@@ -116,6 +121,8 @@ func getStakeEntropyBit(b *BlockChain, block *btcutil.Block) (uint32, error) {
 		//if (fDebug && GetBoolArg("-printstakemodifier"))
 		//    printf(" entropybit=%d\n", nEntropyBit)
 	}
+
+	log.Tracef("Entropy bit = %d for block %v", nEntropyBit, hash)
 
 	return nEntropyBit, nil
 }
@@ -163,4 +170,17 @@ func minInt64(a int64, b int64) int64 {
 
 func getAdjustedTime() int64 {
 	return time.Now().Unix() // TODO differs from peercoin core, probably exists in btcd
+}
+
+func now() time.Time {
+    return time.Now()
+}
+
+func timeTrack(start time.Time, name string) {
+    elapsed := time.Since(start)
+    log.Tracef("%s took %s", name, elapsed)
+}
+
+func slice(args ...interface{}) []interface{} {
+    return args
 }

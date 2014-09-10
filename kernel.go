@@ -70,6 +70,8 @@ func (s blockTimeHashSorter) Less(i, j int) bool {
 func (b *BlockChain) GetLastStakeModifier(pindex *blockNode) (
 	nStakeModifier uint64, nModifierTime int64, err error) {
 
+	defer timeTrack(now(), fmt.Sprintf("GetLastStakeModifier(%v)", pindex.hash))
+
 	if pindex == nil {
 		err = errors.New("GetLastStakeModifier: nil pindex")
 		return
@@ -122,6 +124,8 @@ func selectBlockFromCandidates(
 	mapSelectedBlocks map[*btcwire.ShaHash]*blockNode,
 	nSelectionIntervalStop int64,
 	nStakeModifierPrev uint64) (pindexSelected *blockNode, err error) {
+
+	defer timeTrack(now(), fmt.Sprintf("selectBlockFromCandidates"))
 
 	var hashBest *btcwire.ShaHash = new(btcwire.ShaHash)
 	fSelected := false
@@ -186,7 +190,7 @@ func selectBlockFromCandidates(
 		}
 	}
 	//if fDebug && GetBoolArg("-printstakemodifier") {
-	log.Debugf("SelectBlockFromCandidates: selection hash=%s\n", hashBest.String())
+	log.Debugf("SelectBlockFromCandidates: selection hash=%v", hashBest)
 	//}
 	return
 }
@@ -206,6 +210,8 @@ func selectBlockFromCandidates(
 // blocks.
 func (b *BlockChain) ComputeNextStakeModifier(pindexCurrent *btcutil.Block) (
 	nStakeModifier uint64, fGeneratedStakeModifier bool, err error) {
+
+	defer timeTrack(now(), fmt.Sprintf("ComputeNextStakeModifier(%v)", slice(pindexCurrent.Sha())[0]))
 
 	nStakeModifier = 0
 	fGeneratedStakeModifier = false
@@ -348,6 +354,8 @@ func (b *BlockChain) GetKernelStakeModifier(
 	nStakeModifier uint64, nStakeModifierHeight int32, nStakeModifierTime int64,
 	err error) {
 
+	defer timeTrack(now(), fmt.Sprintf("GetKernelStakeModifier(%v)", hashBlockFrom))
+
 	nStakeModifier = 0
 	pindexFrom, loadErr := b.loadBlockNode(hashBlockFrom)
 	if loadErr != nil {
@@ -407,6 +415,8 @@ func (b *BlockChain) CheckStakeKernelHash(
 	txPrev *btcutil.Tx, prevout *btcwire.OutPoint, nTimeTx int64,
 	fPrintProofOfStake bool) (
 	hashProofOfStake *btcwire.ShaHash, success bool, err error) {
+
+	defer timeTrack(now(), fmt.Sprintf("CheckStakeKernelHash(%v)", slice(blockFrom.Sha())[0]))
 
 	success = false
 
@@ -550,9 +560,9 @@ func (b *BlockChain) CheckStakeKernelHash(
 
 // Check kernel hash target and coinstake signature
 func (b *BlockChain) CheckProofOfStake(tx *btcutil.Tx, nBits uint32) (
-	hashProofOfStake *btcwire.ShaHash, success bool, err error) {
+	hashProofOfStake *btcwire.ShaHash, err error) {
 
-	success = false
+	defer timeTrack(now(), fmt.Sprintf("CheckProofOfStake(%v)", slice(tx.Sha())[0]))
 
 	msgTx := tx.MsgTx()
 
@@ -605,6 +615,7 @@ func (b *BlockChain) CheckProofOfStake(tx *btcutil.Tx, nBits uint32) (
 	fDebug := true
 	//nTxPrevOffset uint := txindex.pos.nTxPos - txindex.pos.nBlockPos
 	prevBlockTxLoc, _ := prevBlock.TxLoc() // TODO not optimal way
+	var success bool
 	var nTxPrevOffset uint32 = uint32(prevBlockTxLoc[txPrev.Index()].TxStart)
 	hashProofOfStake, success, err = b.CheckStakeKernelHash(
 		nBits, prevBlock, nTxPrevOffset, txPrev, &txin.PreviousOutpoint,
@@ -636,6 +647,8 @@ func (b *BlockChain) CheckCoinStakeTimestamp(
 // called from main.cpp
 func (b *BlockChain) GetStakeModifierChecksum(
 	pindex *btcutil.Block) (checkSum uint32, err error) {
+
+	defer timeTrack(now(), fmt.Sprintf("GetStakeModifierChecksum(%v)", slice(pindex.Sha())[0]))
 
 	//assert (pindex.pprev || pindex.Sha().IsEqual(hashGenesisBlock))
 	// Hash previous checksum with flags, hashProofOfStake and nStakeModifier
