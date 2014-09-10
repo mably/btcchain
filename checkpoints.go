@@ -84,6 +84,9 @@ func (b *BlockChain) verifyCheckpoint(height int64, hash *btcwire.ShaHash) bool 
 // associated block.  It returns nil if a checkpoint can't be found (this should
 // really only happen for blocks before the first checkpoint).
 func (b *BlockChain) findPreviousCheckpoint() (*btcutil.Block, error) {
+
+	defer timeTrack(now(), fmt.Sprintf("findPreviousCheckpoint"))
+
 	if b.noCheckpoints || len(b.netParams.Checkpoints) == 0 {
 		return nil, nil
 	}

@@ -184,6 +184,9 @@ func CalcBlockSubsidy(height int64, netParams *btcnet.Params) int64 {
 // CheckTransactionSanity performs some preliminary checks on a transaction to
 // ensure it is sane.  These checks are context free.
 func CheckTransactionSanity(tx *btcutil.Tx) error {
+
+	defer timeTrack(now(), fmt.Sprintf("CheckTransactionSanity(%v)", slice(tx.Sha())[0]))
+
 	// A transaction must have at least one input.
 	msgTx := tx.MsgTx()
 	if len(msgTx.TxIn) == 0 {
@@ -424,6 +427,9 @@ func CountP2SHSigOps(tx *btcutil.Tx, isCoinBaseTx bool, txStore TxStore) (int, e
 // The flags do not modify the behavior of this function directly, however they
 // are needed to pass along to checkProofOfWork.
 func checkBlockSanity(block *btcutil.Block, powLimit *big.Int, flags BehaviorFlags) error {
+
+	defer timeTrack(now(), fmt.Sprintf("checkBlockSanity(%v)", slice(block.Sha())[0]))
+
 	// A block must have at least one transaction.
 	msgBlock := block.MsgBlock()
 	numTx := len(msgBlock.Transactions)
@@ -658,6 +664,9 @@ func (b *BlockChain) checkBIP0030(node *blockNode, block *btcutil.Block) error {
 // the bitcoins and therefore allowed to spend them.  As it checks the inputs,
 // it also calculates the total fees for the transaction and returns that value.
 func CheckTransactionInputs(tx *btcutil.Tx, txHeight int64, txStore TxStore) (int64, error) {
+
+	defer timeTrack(now(), fmt.Sprintf("CheckTransactionInputs(%v)", slice(tx.Sha())[0]))
+
 	// Coinbase transactions have no inputs.
 	if IsCoinBase(tx) {
 		return 0, nil
@@ -778,6 +787,9 @@ func CheckTransactionInputs(tx *btcutil.Tx, txHeight int64, txStore TxStore) (in
 // See the comments for CheckConnectBlock for some examples of the type of
 // checks performed by this function.
 func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block) error {
+
+	defer timeTrack(now(), fmt.Sprintf("checkConnectBlock(%v)", slice(block.Sha())[0]))
+
 	// If the side chain blocks end up in the database, a call to
 	// CheckBlockSanity should be done here in case a previous version
 	// allowed a block that is no longer valid.  However, since the

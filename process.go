@@ -56,6 +56,9 @@ func (b *BlockChain) blockExists(hash *btcwire.ShaHash) (bool, error) {
 // The flags do not modify the behavior of this function directly, however they
 // are needed to pass along to maybeAcceptBlock.
 func (b *BlockChain) processOrphans(hash *btcwire.ShaHash, flags BehaviorFlags) error {
+
+	defer timeTrack(now(), fmt.Sprintf("processOrphans(%v)", hash))
+
 	// Start with processing at least the passed hash.  Leave a little room
 	// for additional orphan blocks that need to be processed without
 	// needing to grow the array in the common case.
@@ -115,6 +118,9 @@ func (b *BlockChain) processOrphans(hash *btcwire.ShaHash, flags BehaviorFlags) 
 // any errors that occurred during processing.  The returned bool is only valid
 // when the error is nil.
 func (b *BlockChain) ProcessBlock(block *btcutil.Block, flags BehaviorFlags) (bool, error) {
+
+	defer timeTrack(now(), fmt.Sprintf("ProcessBlock(%v)", slice(block.Sha())[0]))
+
 	fastAdd := flags&BFFastAdd == BFFastAdd
 	dryRun := flags&BFDryRun == BFDryRun
 
@@ -208,17 +214,19 @@ func (b *BlockChain) ProcessBlock(block *btcutil.Block, flags BehaviorFlags) (bo
     // ppcoin: verify hash target and signature of coinstake tx
     // TODO is it the best place to do that?
 	if block.MsgBlock().IsProofOfStake() {
+		log.Tracef("Block %v is PoS", blockHash)
 		tx, err := block.Tx(1)
 		if err != nil {
 			return false, err
 		}
-		hashProofOfStake, success, err :=
+		hashProofOfStake, err :=
 			b.CheckProofOfStake(tx, block.MsgBlock().Header.Bits)
 		if err != nil {
-			return false, err // TODO create specific error rule
-		}
-		if success {
+			str := fmt.Sprintf("Proof of stake check failed for block %v : %v", blockHash, err)
+			return false, ruleError(ErrProofOfStakeCheck, str)
+		} else {
 			block.Meta().HashProofOfStake = *hashProofOfStake
+			log.Debugf("Proof of stake for block %v = %v", blockHash, hashProofOfStake)
 		}
 	}
 
