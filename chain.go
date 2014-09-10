@@ -117,8 +117,10 @@ type orphanBlock struct {
 // inserted from the database into the memory chain prior to nodes we already
 // have and update their work values accordingly.
 func addChildrenWork(node *blockNode, work *big.Int) {
+	defer timeTrack(now(), fmt.Sprintf("addChildrenWork(%v)", node.hash))
 	for _, childNode := range node.children {
 		childNode.workSum.Add(childNode.workSum, work)
+		log.Debugf("Child node = %v", childNode)
 		addChildrenWork(childNode, work)
 	}
 }
@@ -409,7 +411,7 @@ func (b *BlockChain) GenerateInitialIndex() error {
 // are needed to avoid needing to put the entire block chain in memory.
 func (b *BlockChain) loadBlockNode(hash *btcwire.ShaHash) (*blockNode, error) {
 	// Load the block header and height from the db.
-
+	defer timeTrack(now(), fmt.Sprintf("loadBlockNode(%v)", hash))
 	// TODO(kac-) OVERHEAD
 	// we need meta so we fetch whole block with meta and take meta
 	//blockHeader, err := b.db.FetchBlockHeaderBySha(hash)
@@ -419,10 +421,11 @@ func (b *BlockChain) loadBlockNode(hash *btcwire.ShaHash) (*blockNode, error) {
 	}
 	blockHeader := &block.MsgBlock().Header
 	meta := block.Meta()
-	blockHeight, err := b.db.FetchBlockHeightBySha(hash)
+	blockHeight := block.Height()
+	/*blockHeight, err := b.db.FetchBlockHeightBySha(hash) // TODO
 	if err != nil {
 		return nil, err
-	}
+	}*/
 	// Create the new block node for the block and set the work.
 	node := ppcNewBlockNode(blockHeader, hash, blockHeight, meta)
 	node.inMainChain = true
@@ -437,7 +440,9 @@ func (b *BlockChain) loadBlockNode(hash *btcwire.ShaHash) (*blockNode, error) {
 	//  4) Neither 1 or 2 is true, but this is the first node being added
 	//     to the tree, so it's the root.
 	prevHash := &blockHeader.PrevBlock
-	if parentNode, ok := b.index[*prevHash]; ok {
+	parentNode, ok := b.index[*prevHash];
+	log.Debugf("height = %d, prevHash = %v, parentNode = %v, ok = %v", blockHeight, prevHash, parentNode, ok)
+	if ok {
 		// Case 1 -- This node is a child of an existing block node.
 		// Update the node's work sum with the sum of the parent node's
 		// work sum and this node's work, append the node as a child of
@@ -448,6 +453,7 @@ func (b *BlockChain) loadBlockNode(hash *btcwire.ShaHash) (*blockNode, error) {
 		node.parent = parentNode
 
 	} else if childNodes, ok := b.depNodes[*hash]; ok {
+
 		// Case 2 -- This node is the parent of one or more nodes.
 		// Connect this block node to all of its children and update
 		// all of the children (and their children) with the new work
@@ -455,7 +461,7 @@ func (b *BlockChain) loadBlockNode(hash *btcwire.ShaHash) (*blockNode, error) {
 		for _, childNode := range childNodes {
 			childNode.parent = node
 			node.children = append(node.children, childNode)
-			addChildrenWork(childNode, node.workSum)
+			//addChildrenWork(childNode, node.workSum) TODO takes too long to process
 			b.root = node
 		}
 

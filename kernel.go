@@ -237,10 +237,10 @@ func (b *BlockChain) ComputeNextStakeModifier(pindexCurrent *btcutil.Block) (
 		return
 	}
 
-	log.Debugf("ComputeNextStakeModifier: prev modifier=%u time=%s epoch=%u\n", nStakeModifier, dateTimeStrFormat(nModifierTime), uint(nModifierTime))
+	log.Debugf("ComputeNextStakeModifier: prev modifier=%d time=%s epoch=%d\n", nStakeModifier, dateTimeStrFormat(nModifierTime), uint(nModifierTime))
 
 	if (nModifierTime / nModifierInterval) >= (pindexPrev.timestamp.Unix() / nModifierInterval) {
-		log.Debugf("ComputeNextStakeModifier: no new interval keep current modifier: pindexPrev nHeight=%d nTime=%u\n", pindexPrev.height, pindexPrev.timestamp.Unix)
+		log.Debugf("ComputeNextStakeModifier: no new interval keep current modifier: pindexPrev nHeight=%d nTime=%d\n", pindexPrev.height, pindexPrev.timestamp.Unix)
 		return
 	}
 
@@ -248,7 +248,7 @@ func (b *BlockChain) ComputeNextStakeModifier(pindexCurrent *btcutil.Block) (
 	if (nModifierTime / nModifierInterval) >= (pindexCurrentHeader.Timestamp.Unix() / nModifierInterval) {
 		// v0.4+ requires current block timestamp also be in a different modifier interval
 		if isProtocolV04(b, pindexCurrentHeader.Timestamp.Unix()) {
-			log.Debugf("ComputeNextStakeModifier: (v0.4+) no new interval keep current modifier: pindexCurrent nHeight=%d nTime=%u\n", pindexCurrent.Height(), pindexCurrentHeader.Timestamp.Unix())
+			log.Debugf("ComputeNextStakeModifier: (v0.4+) no new interval keep current modifier: pindexCurrent nHeight=%d nTime=%d\n", pindexCurrent.Height(), pindexCurrentHeader.Timestamp.Unix())
 			return
 		} else {
 			currentSha, errSha := pindexCurrent.Sha()
@@ -256,7 +256,7 @@ func (b *BlockChain) ComputeNextStakeModifier(pindexCurrent *btcutil.Block) (
 				err = errSha
 				return
 			}
-			log.Debugf("ComputeNextStakeModifier: v0.3 modifier at block %s not meeting v0.4+ protocol: pindexCurrent nHeight=%d nTime=%u\n", currentSha.String(), pindexCurrent.Height(), pindexCurrentHeader.Timestamp.Unix())
+			log.Debugf("ComputeNextStakeModifier: v0.3 modifier at block %s not meeting v0.4+ protocol: pindexCurrent nHeight=%d nTime=%d\n", currentSha.String(), pindexCurrent.Height(), pindexCurrentHeader.Timestamp.Unix())
 		}
 	}
 
@@ -267,6 +267,7 @@ func (b *BlockChain) ComputeNextStakeModifier(pindexCurrent *btcutil.Block) (
 	//vSortedByTimestamp.reserve(64 * nModifierInterval / STAKE_TARGET_SPACING)
 	var nSelectionInterval int64 = getStakeModifierSelectionInterval(b)
 	var nSelectionIntervalStart int64 = (pindexPrev.timestamp.Unix()/nModifierInterval)*nModifierInterval - nSelectionInterval
+	log.Debugf("ComputeNextStakeModifier: nSelectionInterval = %d, nSelectionIntervalStart = %d", nSelectionInterval, nSelectionIntervalStart)
 	var pindex *blockNode = pindexPrev
 	for pindex != nil && (pindex.timestamp.Unix() >= nSelectionIntervalStart) {
 		vSortedByTimestamp = append(vSortedByTimestamp,
@@ -299,7 +300,7 @@ func (b *BlockChain) ComputeNextStakeModifier(pindexCurrent *btcutil.Block) (
 		// add the selected block from candidates to selected list
 		mapSelectedBlocks[pindex.hash] = pindex
 		//if (fDebug && GetBoolArg("-printstakemodifier")) {
-		log.Debugf("ComputeNextStakeModifier: selected round %d stop=%s height=%d bit=%d\n",
+		log.Debugf("ComputeNextStakeModifier: selected round %d stop=%s height=%d bit=%d",
 			nRound, dateTimeStrFormat(nSelectionIntervalStop),
 			pindex.height, GetStakeEntropyBit(pindex.meta))
 		//}
@@ -338,7 +339,7 @@ func (b *BlockChain) ComputeNextStakeModifier(pindexCurrent *btcutil.Block) (
 			log.Debugf("ComputeNextStakeModifier: selection height [%d, %d] map %s\n", nHeightFirstCandidate, pindexPrev.Height(), strSelectionMap)
 		}*/
 
-	log.Debugf("ComputeNextStakeModifier: new modifier=%u time=%s\n",
+	log.Debugf("ComputeNextStakeModifier: new modifier=%d time=%s",
 		nStakeModifierNew, dateTimeStrFormat(pindexPrev.timestamp.Unix()))
 
 	nStakeModifier = nStakeModifierNew
@@ -507,7 +508,7 @@ func (b *BlockChain) CheckStakeKernelHash(
 
 	if fPrintProofOfStake {
 		if isProtocolV03(b, nTimeTx) {
-			log.Debugf("CheckStakeKernelHash() : using modifier %u at height=%d timestamp=%s for block from height=%d timestamp=%s\n",
+			log.Debugf("CheckStakeKernelHash() : using modifier %d at height=%d timestamp=%s for block from height=%d timestamp=%s\n",
 				nStakeModifier, nStakeModifierHeight,
 				dateTimeStrFormat(nStakeModifierTime), blockFrom.Height(),
 				dateTimeStrFormat(nTimeBlockFrom))
@@ -521,7 +522,7 @@ func (b *BlockChain) CheckStakeKernelHash(
 			ver = "0.2"
 			modifier = uint64(nBits)
 		}
-		log.Debugf("CheckStakeKernelHash() : check protocol=%s modifier=%u nTimeBlockFrom=%u nTxPrevOffset=%u nTimeTxPrev=%u nPrevout=%u nTimeTx=%u hashProof=%s\n",
+		log.Debugf("CheckStakeKernelHash() : check protocol=%s modifier=%d nTimeBlockFrom=%d nTxPrevOffset=%d nTimeTxPrev=%d nPrevout=%d nTimeTx=%d hashProof=%s\n",
 			ver, modifier, nTimeBlockFrom, nTxPrevOffset, txMsgPrev.Time.Unix(),
 			prevout.Index, nTimeTx, hashProofOfStake.String())
 	}
@@ -535,7 +536,7 @@ func (b *BlockChain) CheckStakeKernelHash(
 	//if (fDebug && !fPrintProofOfStake) {
 	if !fPrintProofOfStake {
 		if isProtocolV03(b, nTimeTx) {
-			log.Debugf("CheckStakeKernelHash() : using modifier %u at height=%d timestamp=%s for block from height=%d timestamp=%s\n",
+			log.Debugf("CheckStakeKernelHash() : using modifier %d at height=%d timestamp=%s for block from height=%d timestamp=%s\n",
 				nStakeModifier, nStakeModifierHeight,
 				dateTimeStrFormat(nStakeModifierTime), blockFrom.Height(),
 				dateTimeStrFormat(nTimeBlockFrom))
@@ -549,7 +550,7 @@ func (b *BlockChain) CheckStakeKernelHash(
 			ver = "0.2"
 			modifier = uint64(nBits)
 		}
-		log.Debugf("CheckStakeKernelHash() : pass protocol=%s modifier=%u nTimeBlockFrom=%u nTxPrevOffset=%u nTimeTxPrev=%u nPrevout=%u nTimeTx=%u hashProof=%s\n",
+		log.Debugf("CheckStakeKernelHash() : pass protocol=%s modifier=%d nTimeBlockFrom=%d nTxPrevOffset=%d nTimeTxPrev=%d nPrevout=%d nTimeTx=%d hashProof=%s\n",
 			ver, modifier, nTimeBlockFrom, nTxPrevOffset, txMsgPrev.Time.Unix(),
 			prevout.Index, nTimeTx, hashProofOfStake.String())
 	}

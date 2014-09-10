@@ -101,7 +101,7 @@ func getStakeEntropyBit(b *BlockChain, block *btcutil.Block) (uint32, error) {
 		nEntropyBit = uint32((ShaHashToBig(hash).Int64()) & 1) // last bit of block hash
 
 		//if (fDebug && GetBoolArg("-printstakemodifier"))
-		//    printf("GetStakeEntropyBit(v0.4+): nTime=%u hashBlock=%s entropybit=%d\n", nTime, GetHash().ToString().c_str(), nEntropyBit);
+		//    printf("GetStakeEntropyBit(v0.4+): nTime=%d hashBlock=%s entropybit=%d\n", nTime, GetHash().ToString().c_str(), nEntropyBit);
 
 	} else {
 
@@ -113,7 +113,7 @@ func getStakeEntropyBit(b *BlockChain, block *btcutil.Block) (uint32, error) {
 			hashSigBytes[i], hashSigBytes[blen-1-i] = hashSigBytes[blen-1-i], hashSigBytes[i]
 		}
 		//if (fDebug && GetBoolArg("-printstakemodifier"))
-		//    printf("GetStakeEntropyBit(v0.3): nTime=%u hashSig=%s", nTime, hashSig.ToString().c_str());
+		//    printf("GetStakeEntropyBit(v0.3): nTime=%d hashSig=%s", nTime, hashSig.ToString().c_str());
 		hashSig := new(big.Int).SetBytes(hashSigBytes)
 		hashSig.Rsh(hashSig, 159) // take the first bit of the hash
 		nEntropyBit = uint32(hashSig.Int64())
