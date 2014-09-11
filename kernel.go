@@ -425,30 +425,36 @@ func (b *BlockChain) CheckStakeKernelHash(
 		return
 	}
 
-	bnTargetPerCoinDay := CompactToBig(uint32(nBits))
+	bnTargetPerCoinDay := CompactToBig(nBits)
 
 	var nValueIn int64 = txMsgPrev.TxOut[prevout.Index].Value
+	log.Infof("CheckStakeKernelHash() : nValueIn = %v", nValueIn)
+
 	// v0.3 protocol kernel hash weight starts from 0 at the 30-day min age
 	// this change increases active coins participating the hash and helps
 	// to secure the network when proof-of-stake difficulty is low
 	var timeDelta int64
-	if isProtocolV03(b, int64(nTimeTx)) {
+	if isProtocolV03(b, nTimeTx) {
 		timeDelta = StakeMinAge
 	} else {
 		timeDelta = 0
 	}
-	var nTimeWeight int64 = minInt64(int64(nTimeTx)-txMsgPrev.Time.Unix(), int64(StakeMaxAge)) - timeDelta
+	var nTimeWeight int64 = minInt64(nTimeTx-txMsgPrev.Time.Unix(), StakeMaxAge) - timeDelta
+	log.Infof("CheckStakeKernelHash() : nTimeWeight = %v", nTimeWeight)
+
 	//CBigNum bnCoinDayWeight = CBigNum(nValueIn) * nTimeWeight / COIN / (24 * 60 * 60)
-	var bnCoinDayWeight *big.Int = new(big.Int).Mul(
-		big.NewInt(nValueIn), big.NewInt(nTimeWeight/COIN/24*60*60))
+	var bnCoinDayWeight *big.Int = new(big.Int).Div(new(big.Int).Mul(
+		big.NewInt(nValueIn / COIN), big.NewInt(nTimeWeight)), big.NewInt(24*60*60))
+	log.Infof("CheckStakeKernelHash() : bnCoinDayWeight = %v", bnCoinDayWeight)
 
 	// Calculate hash
-	buf := bytes.NewBuffer(make([]byte, 0, 1000)) // TODO calculate size
+	buf := bytes.NewBuffer(make([]byte, 0, 500)) // TODO calculate size
 
+	bufSize := 0
 	var nStakeModifier uint64
 	var nStakeModifierHeight int32
 	var nStakeModifierTime int64
-	if isProtocolV03(b, int64(nTimeTx)) { // v0.3 protocol
+	if isProtocolV03(b, nTimeTx) { // v0.3 protocol
 		var blockSha *btcwire.ShaHash
 		blockSha, err = blockFrom.Sha()
 		if err != nil {
@@ -459,36 +465,44 @@ func (b *BlockChain) CheckStakeKernelHash(
 		if err != nil {
 			return
 		}
+		log.Infof("CheckStakeKernelHash() : nStakeModifier = %v", nStakeModifier)
 		//ss << nStakeModifier;
 		err = writeElement(buf, nStakeModifier)
+		bufSize += 8
 		if err != nil {
 			return
 		}
 	} else { // v0.2 protocol
 		//ss << nBits;
 		err = writeElement(buf, nBits)
+		bufSize += 4
 		if err != nil {
 			return
 		}
 	}
 
 	err = writeElement(buf, nTimeBlockFrom)
+	bufSize += 8
 	if err != nil {
 		return
 	}
 	err = writeElement(buf, nTxPrevOffset)
+	bufSize += 4
 	if err != nil {
 		return
 	}
-	err = writeElement(buf, txMsgPrev.Time.Unix())
+	err = writeElement(buf, uint32(txMsgPrev.Time.Unix()))
+	bufSize += 8
 	if err != nil {
 		return
 	}
 	err = writeElement(buf, prevout.Index)
+	bufSize += 4
 	if err != nil {
 		return
 	}
-	err = writeElement(buf, nTimeTx)
+	err = writeElement(buf, uint32(nTimeTx))
+	bufSize += 4
 	if err != nil {
 		return
 	}
@@ -496,7 +510,13 @@ func (b *BlockChain) CheckStakeKernelHash(
 	//ss << nTimeBlockFrom << nTxPrevOffset << txPrev.nTime << prevout.n << nTimeTx;
 
 	//hashProofOfStake = Hash(ss.begin(), ss.end());
-	_ = hashProofOfStake.SetBytes(btcwire.DoubleSha256(buf.Bytes()))
+	hashProofOfStake, err = btcwire.NewShaHash(
+		btcwire.DoubleSha256(buf.Bytes()[0:bufSize]))
+	if err != nil {
+		return
+	}
+
+	log.Infof("CheckStakeKernelHash() : hashProofOfStake = %v", hashProofOfStake)
 
 	if fPrintProofOfStake {
 		if isProtocolV03(b, nTimeTx) {
@@ -573,9 +593,14 @@ func (b *BlockChain) CheckProofOfStake(tx *btcutil.Tx, nBits uint32) (
 		return
 	}
 	var txPrev *btcutil.Tx
+	var txPrevIndex uint32
 	var prevBlockHeight int64
 	if txPrevData, ok := txStore[txin.PreviousOutpoint.Hash]; ok {
+		log.Infof("CheckProofOfStake : txin.PrevOp = %+v", txin.PreviousOutpoint)
+		log.Infof("CheckProofOfStake : txPrevData = %+v", txPrevData)
 		txPrev = txPrevData.Tx
+		txPrevIndex = txin.PreviousOutpoint.Index
+		log.Infof("CheckProofOfStake : txPrev = %+v, %v", txPrev, txPrevIndex)
 		prevBlockHeight = txPrevData.BlockHeight
 	} else {
 		//return tx.DoS(1, error("CheckProofOfStake() : INFO: read txPrev failed"))  // previous transaction not in main chain, may occur during initial download
@@ -608,11 +633,16 @@ func (b *BlockChain) CheckProofOfStake(tx *btcutil.Tx, nBits uint32) (
 	fDebug := true
 	//nTxPrevOffset uint := txindex.pos.nTxPos - txindex.pos.nBlockPos
 	prevBlockTxLoc, _ := prevBlock.TxLoc() // TODO not optimal way
+	log.Infof("CheckProofOfStake : prevBlockTxLoc = %+v", prevBlockTxLoc)
 	var success bool
-	var nTxPrevOffset uint32 = uint32(prevBlockTxLoc[txPrev.Index()].TxStart)
+	log.Infof("CheckProofOfStake : prevBlockTxLoc[%d] = %+v", txPrevIndex, prevBlockTxLoc[txPrevIndex])
+	var nTxPrevOffset uint32 = uint32(prevBlockTxLoc[txPrevIndex].TxStart)
 	hashProofOfStake, success, err = b.CheckStakeKernelHash(
 		nBits, prevBlock, nTxPrevOffset, txPrev, &txin.PreviousOutpoint,
 		msgTx.Time.Unix(), fDebug)
+	if err != nil {
+		return
+	}
 	if !success {
 		//return tx.DoS(1, error("CheckProofOfStake() : INFO: check kernel failed on coinstake %s, hashProof=%s",
 		//		tx.Sha().String(), hashProofOfStake.String())) // may occur during initial download or if behind on block chain sync
@@ -712,16 +742,16 @@ func verifySignature(txStore TxStore, txIn *btcwire.TxIn, tx *btcutil.Tx,
 		flags |= btcscript.ScriptBip16
 	}
 
-	txValItems := make([]*txValidateItem, 1, 1)
 	txVI := &txValidateItem{
 		txInIndex: int(nIn),
 		txIn:      txIn,
 		tx:        tx,
 	}
-	txValItems = append(txValItems, txVI)
+	var txValItems [1]*txValidateItem
+	txValItems[0] = txVI
 
 	validator := newTxValidator(txStore, flags)
-	if err := validator.Validate(txValItems); err != nil {
+	if err := validator.Validate(txValItems[:]); err != nil {
 		return err
 	}
 

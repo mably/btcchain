@@ -315,8 +315,8 @@ func checkProofOfWork(block *btcutil.Block, powLimit *big.Int, flags BehaviorFla
 		}
 		hashNum := ShaHashToBig(blockHash)
 		if hashNum.Cmp(target) > 0 {
-			str := fmt.Sprintf("block hash of %064x is higher than "+
-				"expected max of %064x", hashNum, target)
+			str := fmt.Sprintf("block hash of %v is higher than "+
+				"expected max of %v", hashNum, target)
 			return ruleError(ErrHighHash, str)
 		}
 	}
@@ -454,13 +454,18 @@ func checkBlockSanity(block *btcutil.Block, powLimit *big.Int, flags BehaviorFla
 		return ruleError(ErrBlockTooBig, str)
 	}
 
-	// Ensure the proof of work bits in the block header is in min/max range
-	// and the block hash is less than the target value described by the
-	// bits.
-	err := checkProofOfWork(block, powLimit, flags)
-	if err != nil {
-		return err
+	if !block.MsgBlock().IsProofOfStake() { // ppcoin specific
+
+		// Ensure the proof of work bits in the block header is in min/max range
+		// and the block hash is less than the target value described by the
+		// bits.
+		err := checkProofOfWork(block, powLimit, flags)
+		if err != nil {
+			return err
+		}
+
 	}
+
 
 	// A block timestamp must not have a greater precision than one second.
 	// This check is necessary because Go time.Time values support

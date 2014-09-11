@@ -152,6 +152,25 @@ func (b *BlockChain) ProcessBlock(block *btcutil.Block, flags BehaviorFlags) (bo
 		return false, err
 	}
 
+    // ppcoin: verify hash target and signature of coinstake tx
+    // TODO is it the best place to do that?
+	if block.MsgBlock().IsProofOfStake() {
+		log.Tracef("Block %v is PoS", blockHash)
+		tx, err := block.Tx(1)
+		if err != nil {
+			return false, err
+		}
+		hashProofOfStake, err :=
+			b.CheckProofOfStake(tx, block.MsgBlock().Header.Bits)
+		if err != nil {
+			str := fmt.Sprintf("Proof of stake check failed for block %v : %v", blockHash, err)
+			return false, ruleError(ErrProofOfStakeCheck, str)
+		} else {
+			block.Meta().HashProofOfStake = *hashProofOfStake
+			log.Debugf("Proof of stake for block %v = %v", blockHash, hashProofOfStake)
+		}
+	}
+
 	// Find the previous checkpoint and perform some additional checks based
 	// on the checkpoint.  This provides a few nice properties such as
 	// preventing old side chain blocks before the last checkpoint,
@@ -208,25 +227,6 @@ func (b *BlockChain) ProcessBlock(block *btcutil.Block, flags BehaviorFlags) (bo
 			}
 
 			return true, nil
-		}
-	}
-
-    // ppcoin: verify hash target and signature of coinstake tx
-    // TODO is it the best place to do that?
-	if block.MsgBlock().IsProofOfStake() {
-		log.Tracef("Block %v is PoS", blockHash)
-		tx, err := block.Tx(1)
-		if err != nil {
-			return false, err
-		}
-		hashProofOfStake, err :=
-			b.CheckProofOfStake(tx, block.MsgBlock().Header.Bits)
-		if err != nil {
-			str := fmt.Sprintf("Proof of stake check failed for block %v : %v", blockHash, err)
-			return false, ruleError(ErrProofOfStakeCheck, str)
-		} else {
-			block.Meta().HashProofOfStake = *hashProofOfStake
-			log.Debugf("Proof of stake for block %v = %v", blockHash, hashProofOfStake)
 		}
 	}
 

@@ -27,7 +27,8 @@ func TestPPCProcessBlocks(t *testing.T) {
 	defer dbbc.Close()
 	btcchain.SetLogWriter(os.Stdout, btclog.InfoLvl.String())
 	bc := btcchain.New(dbbc, &btcnet.MainNetParams, nil)
-	blocks, _ := _loadBlocks(t, "blocks1-1536.bz2")
+	//blocks, _ := _loadBlocks(t, "blocks1-1536.bz2")
+	blocks, _ := _loadBlocks(t, "blk0001.dat")
 	for h, block := range blocks {
 		sha, _ := block.Sha()
 		isOrphan, err := bc.ProcessBlock(block, btcchain.BFNone)
@@ -65,8 +66,8 @@ func _loadBlocks(t *testing.T, file string) (blocks []*btcutil.Block, err error)
 	}()
 
 	// Set the first block as the genesis block.
-	genesis := btcutil.NewBlock(btcnet.MainNetParams.GenesisBlock)
-	blocks = append(blocks, genesis)
+	//genesis := btcutil.NewBlock(btcnet.MainNetParams.GenesisBlock)
+	//blocks = append(blocks, genesis)
 
 	var block *btcutil.Block
 	err = nil
@@ -84,8 +85,8 @@ func _loadBlocks(t *testing.T, file string) (blocks []*btcutil.Block, err error)
 			break
 		}
 		if rintbuf != uint32(btcwire.MainNet) {
-			t.Errorf("Block doesn't match network: %v expects %v",
-				rintbuf, btcwire.MainNet)
+			t.Errorf("Block doesn't match network: %v expects %v(%v)",
+				rintbuf, btcwire.MainNet, uint32(btcwire.MainNet))
 			break
 		}
 		err = binary.Read(dr, binary.LittleEndian, &rintbuf)
