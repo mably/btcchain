@@ -30,7 +30,7 @@ const (
 	// causing constant dynamic reloading.
 	minMemoryNodes = BlocksPerRetarget
 
-	// Peercion blockNode flags
+	// Peercoin blockNode flags
 	FBlockProofOfStake  = uint32(1 << 0)
 	FBlockStakeEntropy  = uint32(1 << 1) // entropy bit for stake modifier
 	FBlockStakeModifier = uint32(1 << 2) // regenerated stake modifier
@@ -80,7 +80,7 @@ type blockNode struct {
 	timestamp time.Time
 
 	// Peercoin specific
-	meta *btcutil.Meta
+	meta *btcwire.Meta
 }
 
 // newBlockNode returns a new block node for the given block header.  It is

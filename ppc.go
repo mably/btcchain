@@ -6,7 +6,6 @@ package btcchain
 
 import (
 	"fmt"
-	"github.com/mably/btcutil"
 	"github.com/mably/btcwire"
 	"math/big"
 )
@@ -20,6 +19,24 @@ const (
 )
 
 var ZeroSha = btcwire.ShaHash{}
+
+// getBlockNode try to obtain a node form the memory block chain and loads it
+// form the database in not found in memory.
+func (b *BlockChain) getBlockNode(hash *btcwire.ShaHash) (*blockNode, error) {
+
+	// Return the existing previous block node if it's already there.
+	if bn, ok := b.index[*hash]; ok {
+		return bn, nil
+	}
+
+	// Dynamically load the previous block from the block database, create
+	// a new block node for it, and update the memory chain accordingly.
+	prevBlockNode, err := b.loadBlockNode(hash)
+	if err != nil {
+		return nil, err
+	}
+	return prevBlockNode, nil
+}
 
 // https://github.com/ppcoin/ppcoin/blob/v0.4.0ppc/src/main.cpp#L894
 // ppcoin: find last block index up to pindex
@@ -55,11 +72,12 @@ func (b *BlockChain) GetLastBlockIndex(last *blockNode, proofOfStake bool) (bloc
 // Peercoin https://github.com/ppcoin/ppcoin/blob/v0.4.0ppc/src/main.cpp#L902
 func (b *BlockChain) ppcCalcNextRequiredDifficulty(lastNode *blockNode, proofOfStake bool) (uint32, error) {
 
-	defer timeTrack(now(), fmt.Sprintf("ppcCalcNextRequiredDifficulty(%v)", lastNode.hash))
-
 	if lastNode == nil {
 		return b.netParams.PowLimitBits, nil // genesis block
 	}
+
+	defer timeTrack(now(), fmt.Sprintf("ppcCalcNextRequiredDifficulty(%v)", lastNode.hash))
+
 	prev := b.GetLastBlockIndex(lastNode, proofOfStake)
 	if prev == nil {
 		return InitialHashTargetBits, nil // first block
@@ -128,7 +146,7 @@ func CalcTrust(bits uint32, proofOfStake bool) *big.Int {
 // inserted into a chain.
 func ppcNewBlockNode(
 	blockHeader *btcwire.BlockHeader, blockSha *btcwire.ShaHash, height int64,
-	blockMeta *btcutil.Meta) *blockNode {
+	blockMeta *btcwire.Meta) *blockNode {
 	// Make a copy of the hash so the node doesn't keep a reference to part
 	// of the full block/block header preventing it from being garbage
 	// collected.
@@ -146,11 +164,11 @@ func ppcNewBlockNode(
 	return &node
 }
 
-func IsGeneratedStakeModifier(meta *btcutil.Meta) bool {
+func IsGeneratedStakeModifier(meta *btcwire.Meta) bool {
 	return meta.Flags&FBlockStakeModifier != 0
 }
 
-func SetGeneratedStakeModifier(meta *btcutil.Meta, generated bool) {
+func SetGeneratedStakeModifier(meta *btcwire.Meta, generated bool) {
 	if generated {
 		meta.Flags |= FBlockStakeModifier
 	} else {
@@ -158,14 +176,14 @@ func SetGeneratedStakeModifier(meta *btcutil.Meta, generated bool) {
 	}
 }
 
-func GetStakeEntropyBit(meta *btcutil.Meta) uint32 {
+func GetStakeEntropyBit(meta *btcwire.Meta) uint32 {
 	if meta.Flags&FBlockStakeEntropy > 0 {
 		return 1
 	}
 	return 0
 }
 
-func SetStakeEntropyBit(meta *btcutil.Meta, entropyBit uint32) {
+func SetStakeEntropyBit(meta *btcwire.Meta, entropyBit uint32) {
 	if entropyBit == 0 {
 		meta.Flags &^= FBlockStakeEntropy
 	} else {

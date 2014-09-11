@@ -81,6 +81,9 @@ func (b *BlockChain) AddToBlockIndex(block *btcutil.Block) (err error) {
 	}
 	*/
 
+	log.Tracef("AddToBlockIndex() : height=%d, modifier=%d, checksum=%d",
+		block.Height(), int64(meta.StakeModifier), int32(meta.StakeModifierChecksum))
+
 	return nil
 }
 

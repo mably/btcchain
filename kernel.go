@@ -84,15 +84,9 @@ func (b *BlockChain) GetLastStakeModifier(pindex *blockNode) (
 		}
 	}
 
-	// TODO is it the best way to do that?
 	if !IsGeneratedStakeModifier(pindex.meta) {
-		if pindex.hash.IsEqual(b.netParams.GenesisHash) {
-			pindex.meta.StakeModifier = 0
-			SetGeneratedStakeModifier(pindex.meta, true)
-		} else {
-			err = errors.New("GetLastStakeModifier: no generation at genesis block")
-			return
-		}
+		err = errors.New("GetLastStakeModifier: no generation at genesis block")
+		return
 	}
 
 	nStakeModifier = pindex.meta.StakeModifier
@@ -131,7 +125,7 @@ func selectBlockFromCandidates(
 	fSelected := false
 
 	for _, item := range vSortedByTimestamp {
-		pindex, errLoad := b.loadBlockNode(item.hash)
+		pindex, errLoad := b.getBlockNode(item.hash)
 		if errLoad != nil {
 			err = fmt.Errorf("SelectBlockFromCandidates: failed to find block index for candidate block %s", item.hash.String())
 			return
@@ -240,7 +234,7 @@ func (b *BlockChain) ComputeNextStakeModifier(pindexCurrent *btcutil.Block) (
 	log.Debugf("ComputeNextStakeModifier: prev modifier=%d time=%s epoch=%d\n", nStakeModifier, dateTimeStrFormat(nModifierTime), uint(nModifierTime))
 
 	if (nModifierTime / nModifierInterval) >= (pindexPrev.timestamp.Unix() / nModifierInterval) {
-		log.Debugf("ComputeNextStakeModifier: no new interval keep current modifier: pindexPrev nHeight=%d nTime=%d\n", pindexPrev.height, pindexPrev.timestamp.Unix)
+		log.Debugf("ComputeNextStakeModifier: no new interval keep current modifier: pindexPrev nHeight=%d nTime=%d", pindexPrev.height, pindexPrev.timestamp.Unix())
 		return
 	}
 
@@ -248,7 +242,7 @@ func (b *BlockChain) ComputeNextStakeModifier(pindexCurrent *btcutil.Block) (
 	if (nModifierTime / nModifierInterval) >= (pindexCurrentHeader.Timestamp.Unix() / nModifierInterval) {
 		// v0.4+ requires current block timestamp also be in a different modifier interval
 		if isProtocolV04(b, pindexCurrentHeader.Timestamp.Unix()) {
-			log.Debugf("ComputeNextStakeModifier: (v0.4+) no new interval keep current modifier: pindexCurrent nHeight=%d nTime=%d\n", pindexCurrent.Height(), pindexCurrentHeader.Timestamp.Unix())
+			log.Debugf("ComputeNextStakeModifier: (v0.4+) no new interval keep current modifier: pindexCurrent nHeight=%d nTime=%d", pindexCurrent.Height(), pindexCurrentHeader.Timestamp.Unix())
 			return
 		} else {
 			currentSha, errSha := pindexCurrent.Sha()
@@ -256,7 +250,7 @@ func (b *BlockChain) ComputeNextStakeModifier(pindexCurrent *btcutil.Block) (
 				err = errSha
 				return
 			}
-			log.Debugf("ComputeNextStakeModifier: v0.3 modifier at block %s not meeting v0.4+ protocol: pindexCurrent nHeight=%d nTime=%d\n", currentSha.String(), pindexCurrent.Height(), pindexCurrentHeader.Timestamp.Unix())
+			log.Debugf("ComputeNextStakeModifier: v0.3 modifier at block %s not meeting v0.4+ protocol: pindexCurrent nHeight=%d nTime=%d", currentSha.String(), pindexCurrent.Height(), pindexCurrentHeader.Timestamp.Unix())
 		}
 	}
 
@@ -267,14 +261,13 @@ func (b *BlockChain) ComputeNextStakeModifier(pindexCurrent *btcutil.Block) (
 	//vSortedByTimestamp.reserve(64 * nModifierInterval / STAKE_TARGET_SPACING)
 	var nSelectionInterval int64 = getStakeModifierSelectionInterval(b)
 	var nSelectionIntervalStart int64 = (pindexPrev.timestamp.Unix()/nModifierInterval)*nModifierInterval - nSelectionInterval
-	log.Debugf("ComputeNextStakeModifier: nSelectionInterval = %d, nSelectionIntervalStart = %d", nSelectionInterval, nSelectionIntervalStart)
+	log.Debugf("ComputeNextStakeModifier: nSelectionInterval = %d, nSelectionIntervalStart = %s[%d]", nSelectionInterval, dateTimeStrFormat(nSelectionIntervalStart), nSelectionIntervalStart)
 	var pindex *blockNode = pindexPrev
 	for pindex != nil && (pindex.timestamp.Unix() >= nSelectionIntervalStart) {
 		vSortedByTimestamp = append(vSortedByTimestamp,
 			blockTimeHash{pindex.timestamp.Unix(), pindex.hash})
 		pindex, err = b.getPrevNodeFromNode(pindex)
 	}
-
 	// TODO needs verification
 	//reverse(vSortedByTimestamp.begin(), vSortedByTimestamp.end());
 	//sort(vSortedByTimestamp.begin(), vSortedByTimestamp.end());
@@ -306,41 +299,40 @@ func (b *BlockChain) ComputeNextStakeModifier(pindexCurrent *btcutil.Block) (
 		//}
 	}
 
-	// Print selection map for visualization of the selected blocks
-	/*
-		if (fDebug && GetBoolArg("-printstakemodifier")) {
-			var nHeightFirstCandidate int64
-			if pindex == nil {
-				nHeightFirstCandidate = 0
+    /*// Print selection map for visualization of the selected blocks
+	if (fDebug && GetBoolArg("-printstakemodifier")) {
+		var nHeightFirstCandidate int64
+		if pindex == nil {
+			nHeightFirstCandidate = 0
+		} else {
+			nHeightFirstCandidate = pindex.height + 1
+		}
+		strSelectionMap := ""
+		// '-' indicates proof-of-work blocks not selected
+		strSelectionMap.insert(0, pindexPrev.height - nHeightFirstCandidate + 1, '-')
+		pindex = pindexPrev
+		for pindex != nil && (pindex.height >= nHeightFirstCandidate) {
+			// '=' indicates proof-of-stake blocks not selected
+			if pindex.hashProofOfStake != nil {
+				strSelectionMap.replace(pindex.Height() - nHeightFirstCandidate, 1, "=")
+			}
+			pindex = pindex.pprev
+		}
+		for _, item := range mapSelectedBlocks {
+			// 'S' indicates selected proof-of-stake blocks
+			// 'W' indicates selected proof-of-work blocks
+			if IsBlockProofOfStake(item) {
+				blockType := "S"
 			} else {
-				nHeightFirstCandidate = pindex.height + 1
+				blockType := "W"
 			}
-			strSelectionMap := ""
-			// '-' indicates proof-of-work blocks not selected
-			strSelectionMap.insert(0, pindexPrev.height - nHeightFirstCandidate + 1, '-')
-			pindex = pindexPrev
-			for pindex != nil && (pindex.height >= nHeightFirstCandidate) {
-				// '=' indicates proof-of-stake blocks not selected
-				if pindex.hashProofOfStake != nil {
-					strSelectionMap.replace(pindex.Height() - nHeightFirstCandidate, 1, "=")
-				}
-				pindex = pindex.pprev
-			}
-			for _, item := range mapSelectedBlocks {
-				// 'S' indicates selected proof-of-stake blocks
-				// 'W' indicates selected proof-of-work blocks
-				if IsBlockProofOfStake(item) {
-					blockType := "S"
-				} else {
-					blockType := "W"
-				}
-				strSelectionMap.replace(item.Height() - nHeightFirstCandidate, 1,  blockType);
-			}
-			log.Debugf("ComputeNextStakeModifier: selection height [%d, %d] map %s\n", nHeightFirstCandidate, pindexPrev.Height(), strSelectionMap)
-		}*/
+			strSelectionMap.replace(item.Height() - nHeightFirstCandidate, 1,  blockType);
+		}
+		log.Debugf("ComputeNextStakeModifier: selection height [%d, %d] map %s\n", nHeightFirstCandidate, pindexPrev.Height(), strSelectionMap)
+	}*/
 
-	log.Debugf("ComputeNextStakeModifier: new modifier=%d time=%s",
-		nStakeModifierNew, dateTimeStrFormat(pindexPrev.timestamp.Unix()))
+	log.Debugf("ComputeNextStakeModifier: new modifier=%d time=%s height=%v",
+		int64(nStakeModifierNew), dateTimeStrFormat(pindexPrev.timestamp.Unix()), pindexCurrent.Height())
 
 	nStakeModifier = nStakeModifierNew
 	fGeneratedStakeModifier = true
