@@ -677,9 +677,17 @@ func CheckTransactionInputs(tx *btcutil.Tx, txHeight int64, txStore TxStore) (in
 		return 0, nil
 	}
 
+	// Coinstake
+	if IsCoinStake(tx) {
+		log.Tracef("CheckTransactionInputs : IsCoinStake %+v", tx.Sha())
+		// TODO verification
+		return 0, nil
+	}
+
 	txHash := tx.Sha()
 	var totalSatoshiIn int64
 	for _, txIn := range tx.MsgTx().TxIn {
+
 		// Ensure the input is available.
 		txInHash := &txIn.PreviousOutpoint.Hash
 		originTx, exists := txStore[*txInHash]
