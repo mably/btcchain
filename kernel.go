@@ -428,7 +428,6 @@ func (b *BlockChain) CheckStakeKernelHash(
 	bnTargetPerCoinDay := CompactToBig(nBits)
 
 	var nValueIn int64 = txMsgPrev.TxOut[prevout.Index].Value
-	log.Infof("CheckStakeKernelHash() : nValueIn = %v", nValueIn)
 
 	// v0.3 protocol kernel hash weight starts from 0 at the 30-day min age
 	// this change increases active coins participating the hash and helps
@@ -439,13 +438,11 @@ func (b *BlockChain) CheckStakeKernelHash(
 	} else {
 		timeDelta = 0
 	}
-	var nTimeWeight int64 = minInt64(nTimeTx-txMsgPrev.Time.Unix(), StakeMaxAge) - timeDelta
-	log.Infof("CheckStakeKernelHash() : nTimeWeight = %v", nTimeWeight)
+	var nTimeWeight int64 = minInt64(nTimeTx - txMsgPrev.Time.Unix(), StakeMaxAge) - timeDelta
 
 	//CBigNum bnCoinDayWeight = CBigNum(nValueIn) * nTimeWeight / COIN / (24 * 60 * 60)
 	var bnCoinDayWeight *big.Int = new(big.Int).Div(new(big.Int).Mul(
 		big.NewInt(nValueIn / COIN), big.NewInt(nTimeWeight)), big.NewInt(24*60*60))
-	log.Infof("CheckStakeKernelHash() : bnCoinDayWeight = %v", bnCoinDayWeight)
 
 	// Calculate hash
 	buf := bytes.NewBuffer(make([]byte, 0, 500)) // TODO calculate size
@@ -465,7 +462,6 @@ func (b *BlockChain) CheckStakeKernelHash(
 		if err != nil {
 			return
 		}
-		log.Infof("CheckStakeKernelHash() : nStakeModifier = %v", nStakeModifier)
 		//ss << nStakeModifier;
 		err = writeElement(buf, nStakeModifier)
 		bufSize += 8
@@ -481,8 +477,8 @@ func (b *BlockChain) CheckStakeKernelHash(
 		}
 	}
 
-	err = writeElement(buf, nTimeBlockFrom)
-	bufSize += 8
+	err = writeElement(buf, uint32(nTimeBlockFrom))
+	bufSize += 4
 	if err != nil {
 		return
 	}
@@ -492,7 +488,7 @@ func (b *BlockChain) CheckStakeKernelHash(
 		return
 	}
 	err = writeElement(buf, uint32(txMsgPrev.Time.Unix()))
-	bufSize += 8
+	bufSize += 4
 	if err != nil {
 		return
 	}
@@ -515,8 +511,6 @@ func (b *BlockChain) CheckStakeKernelHash(
 	if err != nil {
 		return
 	}
-
-	log.Infof("CheckStakeKernelHash() : hashProofOfStake = %v", hashProofOfStake)
 
 	if fPrintProofOfStake {
 		if isProtocolV03(b, nTimeTx) {
@@ -596,11 +590,8 @@ func (b *BlockChain) CheckProofOfStake(tx *btcutil.Tx, nBits uint32) (
 	var txPrevIndex uint32
 	var prevBlockHeight int64
 	if txPrevData, ok := txStore[txin.PreviousOutpoint.Hash]; ok {
-		log.Infof("CheckProofOfStake : txin.PrevOp = %+v", txin.PreviousOutpoint)
-		log.Infof("CheckProofOfStake : txPrevData = %+v", txPrevData)
 		txPrev = txPrevData.Tx
 		txPrevIndex = txin.PreviousOutpoint.Index
-		log.Infof("CheckProofOfStake : txPrev = %+v, %v", txPrev, txPrevIndex)
 		prevBlockHeight = txPrevData.BlockHeight
 	} else {
 		//return tx.DoS(1, error("CheckProofOfStake() : INFO: read txPrev failed"))  // previous transaction not in main chain, may occur during initial download
@@ -633,9 +624,7 @@ func (b *BlockChain) CheckProofOfStake(tx *btcutil.Tx, nBits uint32) (
 	fDebug := true
 	//nTxPrevOffset uint := txindex.pos.nTxPos - txindex.pos.nBlockPos
 	prevBlockTxLoc, _ := prevBlock.TxLoc() // TODO not optimal way
-	log.Infof("CheckProofOfStake : prevBlockTxLoc = %+v", prevBlockTxLoc)
 	var success bool
-	log.Infof("CheckProofOfStake : prevBlockTxLoc[%d] = %+v", txPrevIndex, prevBlockTxLoc[txPrevIndex])
 	var nTxPrevOffset uint32 = uint32(prevBlockTxLoc[txPrevIndex].TxStart)
 	hashProofOfStake, success, err = b.CheckStakeKernelHash(
 		nBits, prevBlock, nTxPrevOffset, txPrev, &txin.PreviousOutpoint,
