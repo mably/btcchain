@@ -13,6 +13,7 @@ import (
 	"github.com/mably/btcutil"
 	"github.com/mably/btcwire"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -28,7 +29,7 @@ func TestPPCProcessBlocks(t *testing.T) {
 	btcchain.SetLogWriter(os.Stdout, btclog.InfoLvl.String())
 	bc := btcchain.New(dbbc, &btcnet.MainNetParams, nil)
 	//blocks, _ := _loadBlocks(t, "blocks1-1536.bz2")
-	blocks, _ := _loadBlocks(t, "blk0001.dat")
+	blocks, _ := _loadBlocksMax(t, "blk0001.dat", 7000)
 	for h, block := range blocks {
 		sha, _ := block.Sha()
 		isOrphan, err := bc.ProcessBlock(block, btcchain.BFNone)
@@ -44,6 +45,10 @@ func TestPPCProcessBlocks(t *testing.T) {
 }
 
 func _loadBlocks(t *testing.T, file string) (blocks []*btcutil.Block, err error) {
+	return _loadBlocksMax(t, file, math.MaxInt64)
+}
+
+func _loadBlocksMax(t *testing.T, file string, maxHeight int64) (blocks []*btcutil.Block, err error) {
 	testdatafile := filepath.Join("testdata", file)
 	var dr io.Reader
 	var fi io.ReadCloser
@@ -71,7 +76,7 @@ func _loadBlocks(t *testing.T, file string) (blocks []*btcutil.Block, err error)
 
 	var block *btcutil.Block
 	err = nil
-	for height := int64(1); err == nil; height++ {
+	for height := int64(1); height <= maxHeight && err == nil; height++ {
 		var rintbuf uint32
 		err = binary.Read(dr, binary.LittleEndian, &rintbuf)
 		if err == io.EOF {
