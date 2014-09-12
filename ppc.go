@@ -6,6 +6,7 @@ package btcchain
 
 import (
 	"fmt"
+	"github.com/mably/btcutil"
 	"github.com/mably/btcwire"
 	"math/big"
 )
@@ -13,7 +14,6 @@ import (
 // Peercoin
 const (
 	InitialHashTargetBits  uint32 = 0x1c00ffff
-	privStakeTargetSpacing int64  = 10 * 60 // 10 minutes
 	TargetSpacingWorkMax   int64  = StakeTargetSpacing * 12
 	TargetTimespan         int64  = 7 * 24 * 60 * 60
 )
@@ -42,24 +42,28 @@ func (b *BlockChain) getBlockNode(hash *btcwire.ShaHash) (*blockNode, error) {
 // ppcoin: find last block index up to pindex
 func (b *BlockChain) GetLastBlockIndex(last *blockNode, proofOfStake bool) (block *blockNode) {
 
-	defer timeTrack(now(), fmt.Sprintf("GetLastBlockIndex(%v)", last.hash))
+	if last == nil {
+		defer timeTrack(now(), fmt.Sprintf("GetLastBlockIndex"))
+	} else {
+		defer timeTrack(now(), fmt.Sprintf("GetLastBlockIndex(%v)", last.hash))
+	}
 
 	block = last
 	for true {
 		if block == nil {
 			break
 		}
-		//TODO dirty workaround, ppcoin doesn't point to genesis block
+		// TODO dirty workaround, ppcoin doesn't point to genesis block
 		if block.height == 0 {
-			return nil
-		}
-		if block.parent == nil {
 			break
 		}
-		if (block.meta.Flags & FBlockProofOfStake) > 0 == proofOfStake {
+		if block.parentHash == nil {
 			break
 		}
-		block = block.parent
+		if block.IsProofOfStake() == proofOfStake {
+			break
+		}
+		block, _ = b.getPrevNodeFromNode(block)
 	}
 	return block
 }
@@ -79,29 +83,37 @@ func (b *BlockChain) ppcCalcNextRequiredDifficulty(lastNode *blockNode, proofOfS
 	defer timeTrack(now(), fmt.Sprintf("ppcCalcNextRequiredDifficulty(%v)", lastNode.hash))
 
 	prev := b.GetLastBlockIndex(lastNode, proofOfStake)
-	if prev == nil {
+	if prev.hash.IsEqual(b.netParams.GenesisHash) {
 		return InitialHashTargetBits, nil // first block
 	}
-	prevPrev := b.GetLastBlockIndex(prev.parent, proofOfStake)
-	if prevPrev == nil {
+	prevParent, _ := b.getPrevNodeFromNode(prev)
+	prevPrev := b.GetLastBlockIndex(prevParent, proofOfStake)
+	if prevPrev.hash.IsEqual(b.netParams.GenesisHash) {
 		return InitialHashTargetBits, nil // second block
 	}
+
 	actualSpacing := prev.timestamp.Unix() - prevPrev.timestamp.Unix()
+
 	newTarget := CompactToBig(prev.bits)
 	var targetSpacing int64
 	if proofOfStake {
-		targetSpacing = privStakeTargetSpacing
+		targetSpacing = StakeTargetSpacing
 	} else {
-		targetSpacing = minInt64(TargetSpacingWorkMax, privStakeTargetSpacing*(1+lastNode.height-prev.height))
+		targetSpacing = minInt64(TargetSpacingWorkMax, StakeTargetSpacing * ( 1 + lastNode.height - prev.height))
 	}
 	interval := TargetTimespan / targetSpacing
-	tmp := new(big.Int)
-	newTarget.Mul(newTarget,
-		tmp.SetInt64(interval-1).Mul(tmp, big.NewInt(targetSpacing)).Add(tmp, big.NewInt(actualSpacing+actualSpacing)))
-	newTarget.Div(newTarget, tmp.SetInt64(interval+1).Mul(tmp, big.NewInt(targetSpacing)))
+	targetSpacingBig := big.NewInt(targetSpacing)
+	intervalMinusOne := big.NewInt(interval - 1)
+	intervalPlusOne := big.NewInt(interval + 1)
+	tmp := new(big.Int).Mul(intervalMinusOne, targetSpacingBig)
+	tmp.Add(tmp, big.NewInt(actualSpacing + actualSpacing))
+	newTarget.Mul(newTarget, tmp)
+	newTarget.Div(newTarget, new(big.Int).Mul(intervalPlusOne, targetSpacingBig))
+
 	if newTarget.Cmp(b.netParams.PowLimit) > 0 {
 		newTarget = b.netParams.PowLimit
 	}
+
 	return BigToCompact(newTarget), nil
 }
 
@@ -140,6 +152,12 @@ func CalcTrust(bits uint32, proofOfStake bool) *big.Int {
 	return new(big.Int).Div(oneLsh256, denominator)
 }
 
+// IsCoinStake determines whether or not a transaction is a coinstake.  A coinstake
+// is a special transaction created by peercoin minters.
+func IsCoinStake(tx *btcutil.Tx) bool {
+	return tx.MsgTx().IsCoinStake()
+}
+
 // newBlockNode returns a new block node for the given block header.  It is
 // completely disconnected from the chain and the workSum value is just the work
 // for the passed block.  The work sum is updated accordingly when the node is
@@ -164,10 +182,27 @@ func ppcNewBlockNode(
 	return &node
 }
 
+// https://github.com/ppcoin/ppcoin/blob/v0.4.0ppc/src/main.h#L962
+// ppcoin: two types of block: proof-of-work or proof-of-stake
+func (block *blockNode) IsProofOfStake() bool {
+	return block.meta.Flags&FBlockProofOfStake != 0
+}
+
+// SetProofOfStake
+func SetProofOfStake(meta *btcwire.Meta, proofOfStake bool) {
+	if proofOfStake {
+		meta.Flags |= FBlockProofOfStake
+	} else {
+		meta.Flags &^= FBlockProofOfStake
+	}
+}
+
+// IsGeneratedStakeModifier
 func IsGeneratedStakeModifier(meta *btcwire.Meta) bool {
 	return meta.Flags&FBlockStakeModifier != 0
 }
 
+// SetGeneratedStakeModifier
 func SetGeneratedStakeModifier(meta *btcwire.Meta, generated bool) {
 	if generated {
 		meta.Flags |= FBlockStakeModifier
@@ -176,6 +211,7 @@ func SetGeneratedStakeModifier(meta *btcwire.Meta, generated bool) {
 	}
 }
 
+// GetStakeEntropyBit
 func GetStakeEntropyBit(meta *btcwire.Meta) uint32 {
 	if meta.Flags&FBlockStakeEntropy > 0 {
 		return 1
@@ -183,6 +219,7 @@ func GetStakeEntropyBit(meta *btcwire.Meta) uint32 {
 	return 0
 }
 
+// SetStakeEntropyBit
 func SetStakeEntropyBit(meta *btcwire.Meta, entropyBit uint32) {
 	if entropyBit == 0 {
 		meta.Flags &^= FBlockStakeEntropy
