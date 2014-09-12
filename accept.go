@@ -48,12 +48,13 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, flags BehaviorFlags)
 		// the calculated difficulty based on the previous block and
 		// difficulty retarget rules.
 		expectedDifficulty, err := b.ppcCalcNextRequiredDifficulty(
-			prevNode, block.MsgBlock().IsProofOfStake())
+			prevNode, block.IsProofOfStake())
 		if err != nil {
 			return err
 		}
 		blockDifficulty := blockHeader.Bits
 		if blockDifficulty != expectedDifficulty {
+			log.Infof("maybeAcceptBlock : block %v, prevNode %v(%d)", btcutil.Slice(block.Sha())[0], prevNode.hash, prevNode.bits)
 			str := "block difficulty of %d is not the expected value of %d"
 			str = fmt.Sprintf(str, blockDifficulty, expectedDifficulty)
 			return ruleError(ErrUnexpectedDifficulty, str)
