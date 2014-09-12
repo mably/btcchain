@@ -166,6 +166,7 @@ func (b *BlockChain) ProcessBlock(block *btcutil.Block, flags BehaviorFlags) (bo
 			str := fmt.Sprintf("Proof of stake check failed for block %v : %v", blockHash, err)
 			return false, ruleError(ErrProofOfStakeCheck, str)
 		} else {
+			SetProofOfStake(block.Meta(), true) // Important
 			block.Meta().HashProofOfStake = *hashProofOfStake
 			log.Debugf("Proof of stake for block %v = %v", blockHash, hashProofOfStake)
 		}
