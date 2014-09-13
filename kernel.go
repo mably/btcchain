@@ -89,6 +89,8 @@ func (b *BlockChain) GetLastStakeModifier(pindex *blockNode) (
 		return
 	}
 
+	//log.Infof("pindex height=%v, stkmdf=%v", pindex.height, pindex.meta.StakeModifier)
+
 	nStakeModifier = pindex.meta.StakeModifier
 	nModifierTime = pindex.timestamp.Unix()
 
@@ -168,7 +170,7 @@ func selectBlockFromCandidates(
 			tmp := ShaHashToBig(hashSelection)
 			//hashSelection >>= 32
 			tmp = tmp.Rsh(tmp, 32)
-			hashSelection, err = BigToShaHash(tmp) // TODO BigEndian conversion?
+			hashSelection, err = BigToShaHash(tmp)
 			if err != nil {
 				return
 			}
@@ -336,8 +338,9 @@ func (b *BlockChain) ComputeNextStakeModifier(pindexCurrent *btcutil.Block) (
 		log.Debugf("ComputeNextStakeModifier: selection height [%d, %d] map %s\n", nHeightFirstCandidate, pindexPrev.Height(), strSelectionMap)
 	}*/
 
-	log.Debugf("ComputeNextStakeModifier: new modifier=%d time=%s height=%v",
-		int64(nStakeModifierNew), dateTimeStrFormat(pindexPrev.timestamp.Unix()), pindexCurrent.Height())
+	log.Infof("ComputeNextStakeModifier: new modifier=%v time=%v height=%v",
+		getStakeModifierHexString(nStakeModifierNew),
+		dateTimeStrFormat(pindexPrev.timestamp.Unix()), pindexCurrent.Height())
 
 	nStakeModifier = nStakeModifierNew
 	fGeneratedStakeModifier = true
@@ -676,7 +679,8 @@ func (b *BlockChain) GetStakeModifierChecksum(
 
 	//assert (pindex.pprev || pindex.Sha().IsEqual(hashGenesisBlock))
 	// Hash previous checksum with flags, hashProofOfStake and nStakeModifier
-	buf := bytes.NewBuffer(make([]byte, 0, 1000)) // TODO calculate size
+	bufSize := 0
+	buf := bytes.NewBuffer(make([]byte, 0, 50)) // TODO calculate size
 	//CDataStream ss(SER_GETHASH, 0)
 	var parent *blockNode
 	parent, err = b.getPrevNodeFromBlock(pindex)
@@ -684,6 +688,7 @@ func (b *BlockChain) GetStakeModifierChecksum(
 		//ss << pindex.pprev.nStakeModifierChecksum
 		err = writeElement(
 			buf, parent.meta.StakeModifierChecksum)
+		bufSize += 4
 		if err != nil {
 			return
 		}
@@ -693,21 +698,25 @@ func (b *BlockChain) GetStakeModifierChecksum(
 	meta := pindex.Meta()
 	//ss << pindex.nFlags << pindex.hashProofOfStake << pindex.nStakeModifier
 	err = writeElement(buf, meta.Flags)
+	bufSize += 4
 	if err != nil {
 		return
 	}
 	_, err = buf.Write(meta.HashProofOfStake.Bytes())
+	bufSize += 32
 	if err != nil {
 		return
 	}
 	err = writeElement(buf, meta.StakeModifier)
+	bufSize += 8
 	if err != nil {
 		return
 	}
 
 	//uint256 hashChecksum = Hash(ss.begin(), ss.end())
 	var hashChecksum *btcwire.ShaHash
-	hashChecksum, err = btcwire.NewShaHash(btcwire.DoubleSha256(buf.Bytes()))
+	hashChecksum, err = btcwire.NewShaHash(
+		btcwire.DoubleSha256(buf.Bytes()[:bufSize]))
 	if err != nil {
 		return
 	}

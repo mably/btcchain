@@ -69,13 +69,9 @@ func (b *BlockChain) AddToBlockIndex(block *btcutil.Block) (err error) {
 
 	meta.StakeModifierChecksum, err = b.GetStakeModifierChecksum(block)
 
-	/*bytes := make([]byte, 8)
-	binary.BigEndian.PutUint64(bytes, uint64(meta.StakeModifier))
-	metaModifHex := hex.EncodeToString(bytes)
-	bytesCS := make([]byte, 4)
-	binary.BigEndian.PutUint32(bytesCS, uint32(meta.StakeModifierChecksum))
-	metaModifHexCS := hex.EncodeToString(bytesCS)
-	log.Tracef("Height = %v, Modifier = %v, CheckSum = %v", block.Height(), metaModifHex, metaModifHexCS)*/
+	log.Infof("AddToBlockIndex() : height=%d, modifier=%v, checksum=%v",
+		block.Height(), getStakeModifierHexString(meta.StakeModifier),
+		getStakeModifierCSHexString(meta.StakeModifierChecksum))
 
 	if err != nil {
 		err = errors.New("AddToBlockIndex() : GetStakeModifierChecksum() failed")
@@ -91,10 +87,6 @@ func (b *BlockChain) AddToBlockIndex(block *btcutil.Block) (err error) {
 		setStakeSeen.insert(make_pair(block.prevoutStake, block.nStakeTime)) // TODO later to prevent block flood
 	}
 	*/
-
-	log.Debugf("AddToBlockIndex() : height=%d, modifier=%v, checksum=%v",
-		block.Height(), getStakeModifierHexString(meta.StakeModifier),
-		int32(meta.StakeModifierChecksum))
 
 	return nil
 }
@@ -145,6 +137,12 @@ func getStakeEntropyBit(b *BlockChain, block *btcutil.Block) (uint32, error) {
 func getStakeModifierHexString(stakeModifier uint64) string {
 	bytes := make([]byte, 8)
 	binary.BigEndian.PutUint64(bytes, stakeModifier)
+	return hex.EncodeToString(bytes)
+}
+
+func getStakeModifierCSHexString(stakeModifierCS uint32) string {
+	bytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(bytes, stakeModifierCS)
 	return hex.EncodeToString(bytes)
 }
 
