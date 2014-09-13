@@ -168,7 +168,10 @@ func selectBlockFromCandidates(
 			tmp := ShaHashToBig(hashSelection)
 			//hashSelection >>= 32
 			tmp = tmp.Rsh(tmp, 32)
-			hashSelection.SetBytes(tmp.Bytes()) // TODO BigEndian conversion?
+			hashSelection, err = BigToShaHash(tmp) // TODO BigEndian conversion?
+			if err != nil {
+				return
+			}
 		}
 
 		var hashSelectionInt = ShaHashToBig(hashSelection)
@@ -294,8 +297,7 @@ func (b *BlockChain) ComputeNextStakeModifier(pindexCurrent *btcutil.Block) (
 		// add the selected block from candidates to selected list
 		mapSelectedBlocks[pindex.hash] = pindex
 		//if (fDebug && GetBoolArg("-printstakemodifier")) {
-		//if pindexCurrent.Height() >= 6375 {
-		log.Infof("ComputeNextStakeModifier: selected round %d stop=%s height=%d bit=%d modifier=%v",
+		log.Debugf("ComputeNextStakeModifier: selected round %d stop=%s height=%d bit=%d modifier=%v",
 			nRound, dateTimeStrFormat(nSelectionIntervalStop),
 			pindex.height, GetStakeEntropyBit(pindex.meta),
 			getStakeModifierHexString(nStakeModifierNew))
@@ -576,7 +578,7 @@ func (b *BlockChain) CheckStakeKernelHash(
 }
 
 // Check kernel hash target and coinstake signature
-func (b *BlockChain) CheckProofOfStake(tx *btcutil.Tx, nBits uint32) (
+func (b *BlockChain) checkTxProofOfStake(tx *btcutil.Tx, nBits uint32) (
 	hashProofOfStake *btcwire.ShaHash, err error) {
 
 	defer timeTrack(now(), fmt.Sprintf("CheckProofOfStake(%v)", slice(tx.Sha())[0]))
@@ -726,7 +728,6 @@ func (b *BlockChain) CheckStakeModifierCheckpoints(
 		return true // Testnet has no checkpoints
 	}
 	if checkpoint, ok := mapStakeModifierCheckpoints[nHeight]; ok {
-		log.Infof("%v == %v", nStakeModifierChecksum, checkpoint)
 		return nStakeModifierChecksum == checkpoint
 	}
 	return true
