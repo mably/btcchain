@@ -215,7 +215,7 @@ func (b *BlockChain) ComputeNextStakeModifier(pindexCurrent *btcutil.Block) (
 	nStakeModifier = 0
 	fGeneratedStakeModifier = false
 
-	log.Infof("pindexCurrent = %v, %v", pindexCurrent.Height(), btcutil.Slice(pindexCurrent.Sha())[0])
+	//log.Debugf("pindexCurrent = %v, %v", pindexCurrent.Height(), btcutil.Slice(pindexCurrent.Sha())[0])
 
 	// Get a block node for the block previous to this one.  Will be nil
 	// if this is the genesis block.
