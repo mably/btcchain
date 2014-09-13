@@ -215,6 +215,8 @@ func (b *BlockChain) ComputeNextStakeModifier(pindexCurrent *btcutil.Block) (
 	nStakeModifier = 0
 	fGeneratedStakeModifier = false
 
+	log.Infof("pindexCurrent = %v, %v", pindexCurrent.Height(), btcutil.Slice(pindexCurrent.Sha())[0])
+
 	// Get a block node for the block previous to this one.  Will be nil
 	// if this is the genesis block.
 	pindexPrev, errPrevNode := b.getPrevNodeFromBlock(pindexCurrent)
@@ -299,7 +301,7 @@ func (b *BlockChain) ComputeNextStakeModifier(pindexCurrent *btcutil.Block) (
 		// add the selected block from candidates to selected list
 		mapSelectedBlocks[pindex.hash] = pindex
 		//if (fDebug && GetBoolArg("-printstakemodifier")) {
-		log.Debugf("ComputeNextStakeModifier: selected round %d stop=%s height=%d bit=%d modifier=%v",
+		log.Infof("ComputeNextStakeModifier: selected round %d stop=%s height=%d bit=%d modifier=%v",
 			nRound, dateTimeStrFormat(nSelectionIntervalStop),
 			pindex.height, GetStakeEntropyBit(pindex.meta),
 			getStakeModifierHexString(nStakeModifierNew))

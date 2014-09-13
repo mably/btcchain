@@ -20,16 +20,20 @@ import (
 )
 
 func TestPPCProcessBlocks(t *testing.T) {
+	activeNetParams := btcnet.MainNetParams
 	dbbc, err := btcdb.CreateDB("memdb")
+	genesis := btcutil.NewBlockWithMetas(
+	activeNetParams.GenesisBlock, activeNetParams.GenesisMeta)
+	_, err = dbbc.InsertBlock(genesis)
 	if err != nil {
 		t.Errorf("createdb: %v", err)
 		return
 	}
 	defer dbbc.Close()
 	btcchain.SetLogWriter(os.Stdout, btclog.InfoLvl.String())
-	bc := btcchain.New(dbbc, &btcnet.MainNetParams, nil)
+	bc := btcchain.New(dbbc, &activeNetParams, nil)
 	//blocks, _ := _loadBlocks(t, "blocks1-1536.bz2")
-	blocks, _ := _loadBlocksMax(t, "blk0001.dat", 19100)
+	blocks, _ := _loadBlocksMax(t, "blk0001.dat", 10, 1)
 	for h, block := range blocks {
 		sha, _ := block.Sha()
 		isOrphan, err := bc.ProcessBlock(block, btcchain.BFNone)
@@ -45,10 +49,10 @@ func TestPPCProcessBlocks(t *testing.T) {
 }
 
 func _loadBlocks(t *testing.T, file string) (blocks []*btcutil.Block, err error) {
-	return _loadBlocksMax(t, file, math.MaxInt64)
+	return _loadBlocksMax(t, file, math.MaxInt64, 0)
 }
 
-func _loadBlocksMax(t *testing.T, file string, maxHeight int64) (blocks []*btcutil.Block, err error) {
+func _loadBlocksMax(t *testing.T, file string, maxHeight int64, skip int64) (blocks []*btcutil.Block, err error) {
 	testdatafile := filepath.Join("testdata", file)
 	var dr io.Reader
 	var fi io.ReadCloser
@@ -74,6 +78,7 @@ func _loadBlocksMax(t *testing.T, file string, maxHeight int64) (blocks []*btcut
 	//genesis := btcutil.NewBlock(btcnet.MainNetParams.GenesisBlock)
 	//blocks = append(blocks, genesis)
 
+	var count int64 = 0
 	var block *btcutil.Block
 	err = nil
 	for height := int64(1); height <= maxHeight && err == nil; height++ {
@@ -107,7 +112,12 @@ func _loadBlocksMax(t *testing.T, file string, maxHeight int64) (blocks []*btcut
 			t.Errorf("failed to parse block %v", height)
 			return
 		}
-		blocks = append(blocks, block)
+
+		if (count >= skip) {
+			blocks = append(blocks, block)
+		}
+
+		count++
 	}
 	return
 }
