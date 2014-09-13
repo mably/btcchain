@@ -69,7 +69,7 @@ func (b *BlockChain) AddToBlockIndex(block *btcutil.Block) (err error) {
 
 	meta.StakeModifierChecksum, err = b.GetStakeModifierChecksum(block)
 
-	log.Infof("AddToBlockIndex() : height=%d, modifier=%v, checksum=%v",
+	log.Debugf("AddToBlockIndex() : height=%d, modifier=%v, checksum=%v",
 		block.Height(), getStakeModifierHexString(meta.StakeModifier),
 		getStakeModifierCSHexString(meta.StakeModifierChecksum))
 
@@ -146,26 +146,26 @@ func getStakeModifierCSHexString(stakeModifierCS uint32) string {
 	return hex.EncodeToString(bytes)
 }
 
-// Whether the given coinstake is subject to new v0.3 protocol
-func isProtocolV03(b *BlockChain, nTimeCoinStake int64) bool {
+// isProtocolV03
+func isProtocolV03(b *BlockChain, nTime int64) bool {
 	var switchTime int64
 	if b.netParams.Name == "testnet3" {
 		switchTime = nProtocolV03TestSwitchTime
 	} else {
 		switchTime = nProtocolV03SwitchTime
 	}
-	return nTimeCoinStake >= switchTime
+	return nTime >= switchTime
 }
 
-// Whether the given block is subject to new v0.4 protocol
-func isProtocolV04(b *BlockChain, nTimeBlock int64) bool {
+// isProtocolV04
+func isProtocolV04(b *BlockChain, nTime int64) bool {
 	var v04SwitchTime int64
 	if b.netParams.Name == "testnet3" {
 		v04SwitchTime = nProtocolV04TestSwitchTime
 	} else {
 		v04SwitchTime = nProtocolV04SwitchTime
 	}
-	return nTimeBlock >= v04SwitchTime
+	return nTime >= v04SwitchTime
 }
 
 // dateTimeStrFormat displays time in RFC3339 format
