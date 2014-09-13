@@ -26,11 +26,19 @@ func TestPPCProcessBlocks(t *testing.T) {
 		return
 	}
 	defer dbbc.Close()
+	genesis := btcutil.NewBlockWithMetas(btcnet.MainNetParams.GenesisBlock,
+		btcnet.MainNetParams.GenesisMeta)
+	_, err = dbbc.InsertBlock(genesis)
+	if err != nil {
+		t.Errorf("inserting genesis: %v", err)
+		return
+	}
 	btcchain.SetLogWriter(os.Stdout, btclog.InfoLvl.String())
 	bc := btcchain.New(dbbc, &btcnet.MainNetParams, nil)
 	//blocks, _ := _loadBlocks(t, "blocks1-1536.bz2")
 	//blocks, _ := _loadBlocksMax(t, "blk0001.dat", 19100, nil)
-	_loadBlocksMax(t, "blk0001.dat", math.MaxInt64, func(h int64, block *btcutil.Block)(err error){
+	//_loadBlocksMax(t, "blk0001.dat", math.MaxInt64, func(h int64, block *btcutil.Block)(err error){
+	_loadBlocksMax(t, "blk0001.dat", 10, func(h int64, block *btcutil.Block) (err error) {
 		sha, _ := block.Sha()
 		isOrphan, err := bc.ProcessBlock(block, btcchain.BFNone)
 		if err != nil {
@@ -49,7 +57,7 @@ func _loadBlocks(t *testing.T, file string) (blocks []*btcutil.Block, err error)
 	return _loadBlocksMax(t, file, math.MaxInt64, nil)
 }
 
-func _loadBlocksMax(t *testing.T, file string, maxHeight int64, callback func(h int64, blk *btcutil.Block)(err error)) (blocks []*btcutil.Block, err error) {
+func _loadBlocksMax(t *testing.T, file string, maxHeight int64, callback func(h int64, blk *btcutil.Block) (err error)) (blocks []*btcutil.Block, err error) {
 	testdatafile := filepath.Join("testdata", file)
 	var dr io.Reader
 	var fi io.ReadCloser
@@ -77,7 +85,7 @@ func _loadBlocksMax(t *testing.T, file string, maxHeight int64, callback func(h 
 
 	var block *btcutil.Block
 	err = nil
-	for height := int64(1); height <= maxHeight && err == nil; height++ {
+	for height := int64(0); height <= maxHeight && err == nil; height++ {
 		var rintbuf uint32
 		err = binary.Read(dr, binary.LittleEndian, &rintbuf)
 		if err == io.EOF {
@@ -108,13 +116,16 @@ func _loadBlocksMax(t *testing.T, file string, maxHeight int64, callback func(h 
 			t.Errorf("failed to parse block %v", height)
 			return
 		}
+		if height == 0 {
+			continue
+		}
 		if callback != nil {
 			err = callback(height, block)
 			if err != nil {
 				t.Errorf("callback failed %v", err)
 				break
 			}
-		}else{
+		} else {
 			blocks = append(blocks, block)
 		}
 	}
