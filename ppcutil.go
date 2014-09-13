@@ -5,6 +5,8 @@
 package btcchain
 
 import (
+	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
@@ -66,6 +68,15 @@ func (b *BlockChain) AddToBlockIndex(block *btcutil.Block) (err error) {
 	SetGeneratedStakeModifier(meta, fGeneratedStakeModifier)
 
 	meta.StakeModifierChecksum, err = b.GetStakeModifierChecksum(block)
+
+	/*bytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(bytes, uint64(meta.StakeModifier))
+	metaModifHex := hex.EncodeToString(bytes)
+	bytesCS := make([]byte, 4)
+	binary.BigEndian.PutUint32(bytesCS, uint32(meta.StakeModifierChecksum))
+	metaModifHexCS := hex.EncodeToString(bytesCS)
+	log.Tracef("Height = %v, Modifier = %v, CheckSum = %v", block.Height(), metaModifHex, metaModifHexCS)*/
+
 	if err != nil {
 		err = errors.New("AddToBlockIndex() : GetStakeModifierChecksum() failed")
 		return
@@ -81,8 +92,9 @@ func (b *BlockChain) AddToBlockIndex(block *btcutil.Block) (err error) {
 	}
 	*/
 
-	log.Tracef("AddToBlockIndex() : height=%d, modifier=%d, checksum=%d",
-		block.Height(), int64(meta.StakeModifier), int32(meta.StakeModifierChecksum))
+	log.Debugf("AddToBlockIndex() : height=%d, modifier=%v, checksum=%v",
+		block.Height(), getStakeModifierHexString(meta.StakeModifier),
+		int32(meta.StakeModifierChecksum))
 
 	return nil
 }
@@ -128,6 +140,12 @@ func getStakeEntropyBit(b *BlockChain, block *btcutil.Block) (uint32, error) {
 	log.Tracef("Entropy bit = %d for block %v", nEntropyBit, hash)
 
 	return nEntropyBit, nil
+}
+
+func getStakeModifierHexString(stakeModifier uint64) string {
+	bytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(bytes, stakeModifier)
+	return hex.EncodeToString(bytes)
 }
 
 // Whether the given coinstake is subject to new v0.3 protocol

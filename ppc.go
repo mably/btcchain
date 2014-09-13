@@ -213,7 +213,7 @@ func SetGeneratedStakeModifier(meta *btcwire.Meta, generated bool) {
 
 // GetStakeEntropyBit
 func GetStakeEntropyBit(meta *btcwire.Meta) uint32 {
-	if meta.Flags&FBlockStakeEntropy > 0 {
+	if meta.Flags&FBlockStakeEntropy != 0 {
 		return 1
 	}
 	return 0

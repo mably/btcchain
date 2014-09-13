@@ -226,7 +226,6 @@ func (b *BlockChain) ProcessBlock(block *btcutil.Block, flags BehaviorFlags) (bo
 					blockHash, prevHash)
 				b.addOrphanBlock(block)
 			}
-
 			return true, nil
 		}
 	}
