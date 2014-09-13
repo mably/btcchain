@@ -187,6 +187,7 @@ func (b *BlockChain) ProcessBlock(block *btcutil.Block, flags BehaviorFlags) (bo
 			// check ensures the proof of work is at least the minimum
 			// expected based on elapsed time since the last checkpoint and
 			// maximum adjustment allowed by the retarget rules.
+			/* TODO peercoin : disabled
 			duration := blockHeader.Timestamp.Sub(checkpointTime)
 			requiredTarget := CompactToBig(b.calcEasiestDifficulty(
 				checkpointHeader.Bits, duration))
@@ -196,7 +197,7 @@ func (b *BlockChain) ProcessBlock(block *btcutil.Block, flags BehaviorFlags) (bo
 					"is too low when compared to the previous "+
 					"checkpoint", currentTarget)
 				return false, ruleError(ErrDifficultyTooLow, str)
-			}
+			}*/
 		}
 	}
 
