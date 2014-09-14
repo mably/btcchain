@@ -421,9 +421,10 @@ func (b *BlockChain) loadBlockNode(hash *btcwire.ShaHash) (*blockNode, error) {
 	if err != nil {
 		return nil, err
 	}
-	// Create the new block node for the block and set the work.
+	// Create the new block node for the block and set the work. peercoin
 	node := ppcNewBlockNode(blockHeader, hash, blockHeight, meta)
 	node.inMainChain = true
+	node.workSum =  new(big.Int).Set(&meta.ChainTrust) // peercoin
 
 	// Add the node to the chain.
 	// There are several possibilities here:
@@ -443,7 +444,7 @@ func (b *BlockChain) loadBlockNode(hash *btcwire.ShaHash) (*blockNode, error) {
 		// work sum and this node's work, append the node as a child of
 		// the parent node and set this node's parent to the parent
 		// node.
-		node.workSum = node.workSum.Add(parentNode.workSum, node.workSum)
+		//node.workSum = node.workSum.Add(parentNode.workSum, node.workSum)
 		parentNode.children = append(parentNode.children, node)
 		node.parent = parentNode
 
@@ -456,7 +457,7 @@ func (b *BlockChain) loadBlockNode(hash *btcwire.ShaHash) (*blockNode, error) {
 		for _, childNode := range childNodes {
 			childNode.parent = node
 			node.children = append(node.children, childNode)
-			//addChildrenWork(childNode, node.workSum) TODO takes too long to process
+			//addChildrenWork(childNode, node.workSum)
 			b.root = node
 		}
 
@@ -768,6 +769,10 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block) error {
 		return fmt.Errorf("connectBlock must be called with a block " +
 			"that extends the main chain")
 	}
+
+	// peercoin
+	block.Meta().ChainTrust = *node.workSum
+	//log.Debugf("Block %v trust = %v", node.height, node.workSum)
 
 	// Insert the block into the database which houses the main chain.
 	_, err := b.db.InsertBlock(block)

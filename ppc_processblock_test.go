@@ -33,7 +33,7 @@ func TestPPCProcessBlocks(t *testing.T) {
 	btcchain.SetLogWriter(os.Stdout, btclog.InfoLvl.String())
 	bc := btcchain.New(dbbc, &activeNetParams, nil)
 	//blocks, _ := _loadBlocks(t, "blocks1-1536.bz2")
-	blocks, _ := _loadBlocksMax(t, "blk0001.dat", 38200, 1)
+	blocks, _ := _loadBlocksMax(t, "blk0001.dat", 10000, 1)
 	for h, block := range blocks {
 		sha, _ := block.Sha()
 		isOrphan, err := bc.ProcessBlock(block, btcchain.BFNone)

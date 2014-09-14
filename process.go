@@ -213,7 +213,6 @@ func (b *BlockChain) ProcessBlock(block *btcutil.Block, flags BehaviorFlags) (bo
 				log.Infof("Adding orphan block %v with parent %v",
 					blockHash, prevHash)
 				b.addOrphanBlock(block)
-				//panic("quitting")
 			}
 			return true, nil
 		}

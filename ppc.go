@@ -126,7 +126,7 @@ func (b *BlockChain) PPCCalcNextRequiredDifficulty(proofOfStake bool) (uint32, e
 	return b.ppcCalcNextRequiredDifficulty(b.bestChain, proofOfStake)
 }
 
-// CalcWork calculates a work value from difficulty bits.  Bitcoin increases
+// CalcTrust calculates a work value from difficulty bits.  Bitcoin increases
 // the difficulty for generating a block by decreasing the value which the
 // generated hash must be less than.  This difficulty target is stored in each
 // block header using a compact representation as described in the documenation
@@ -158,7 +158,7 @@ func IsCoinStake(tx *btcutil.Tx) bool {
 	return tx.MsgTx().IsCoinStake()
 }
 
-// newBlockNode returns a new block node for the given block header.  It is
+// ppcNewBlockNode returns a new block node for the given block header.  It is
 // completely disconnected from the chain and the workSum value is just the work
 // for the passed block.  The work sum is updated accordingly when the node is
 // inserted into a chain.
@@ -169,10 +169,12 @@ func ppcNewBlockNode(
 	// of the full block/block header preventing it from being garbage
 	// collected.
 	prevHash := blockHeader.PrevBlock
+	workSum := CalcTrust(blockHeader.Bits, (blockMeta.Flags&FBlockProofOfStake) > 0)
+	//log.Debugf("Height = %v, WorkSum = %v", height, workSum)
 	node := blockNode{
 		hash:       blockSha,
 		parentHash: &prevHash,
-		workSum:    CalcTrust(blockHeader.Bits, (blockMeta.Flags&FBlockProofOfStake) > 0),
+		workSum:    workSum,
 		height:     height,
 		version:    blockHeader.Version,
 		bits:       blockHeader.Bits,
