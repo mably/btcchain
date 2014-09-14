@@ -412,20 +412,15 @@ func (b *BlockChain) GenerateInitialIndex() error {
 func (b *BlockChain) loadBlockNode(hash *btcwire.ShaHash) (*blockNode, error) {
 	// Load the block header and height from the db.
 	defer timeTrack(now(), fmt.Sprintf("loadBlockNode(%v)", hash))
-	// TODO(kac-) OVERHEAD
-	// we need meta so we fetch whole block with meta and take meta
-	//blockHeader, err := b.db.FetchBlockHeaderBySha(hash)
-	block, err := b.db.FetchBlockBySha(hash)
+
+	blockHeader, meta, err := b.db.FetchBlockHeaderBySha(hash)
 	if err != nil {
 		return nil, err
 	}
-	blockHeader := &block.MsgBlock().Header
-	meta := block.Meta()
-	blockHeight := block.Height()
-	/*blockHeight, err := b.db.FetchBlockHeightBySha(hash) // TODO
+	blockHeight, err := b.db.FetchBlockHeightBySha(hash) // TODO
 	if err != nil {
 		return nil, err
-	}*/
+	}
 	// Create the new block node for the block and set the work.
 	node := ppcNewBlockNode(blockHeader, hash, blockHeight, meta)
 	node.inMainChain = true
@@ -440,7 +435,7 @@ func (b *BlockChain) loadBlockNode(hash *btcwire.ShaHash) (*blockNode, error) {
 	//  4) Neither 1 or 2 is true, but this is the first node being added
 	//     to the tree, so it's the root.
 	prevHash := &blockHeader.PrevBlock
-	parentNode, ok := b.index[*prevHash];
+	parentNode, ok := b.index[*prevHash]
 	log.Debugf("height = %d, prevHash = %v, parentNode = %v, ok = %v", blockHeight, prevHash, parentNode, ok)
 	if ok {
 		// Case 1 -- This node is a child of an existing block node.
