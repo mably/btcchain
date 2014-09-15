@@ -1006,7 +1006,7 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 
 	// We're extending (or creating) a side chain, but the cumulative
 	// work for this new side chain is not enough to make it the new chain.
-	if node.workSum.Cmp(b.bestChain.workSum) <= 0 { // TODO peercoin: workSum == meta.chainTrust? dup?
+	if node.workSum.Cmp(b.bestChain.workSum) <= 0 {
 
 		// Skip Logging info when the dry run flag is set.
 		if dryRun {
