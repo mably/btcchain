@@ -577,6 +577,10 @@ func (b *BlockChain) removeBlockNode(node *blockNode) error {
 // chain are needed in memory.  This function walks the chain backwards from the
 // current best chain to find any nodes before the first needed block node.
 func (b *BlockChain) pruneBlockNodes() error {
+	// TODO(kac-) to prune or not to prune?
+	if true {
+		return nil
+	}
 	// Nothing to do if there is not a best chain selected yet.
 	if b.bestChain == nil {
 		return nil
