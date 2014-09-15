@@ -67,9 +67,7 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, flags BehaviorFlags)
 			log.Errorf("calcPastMedianTime: %v", err)
 			return err
 		}
-		// TODO(kac-) check why
-		// !blockHeader.Timestamp.After(medianTime)
-		if blockHeader.Timestamp.Before(medianTime) {
+		if !blockHeader.Timestamp.After(medianTime) {
 			str := "block timestamp of %v is not after expected %v"
 			str = fmt.Sprintf(str, blockHeader.Timestamp, medianTime)
 			return ruleError(ErrTimeTooOld, str)
