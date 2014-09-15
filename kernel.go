@@ -681,6 +681,34 @@ func (b *BlockChain) checkTxProofOfStake(tx *btcutil.Tx, nBits uint32) (
 	return
 }
 
+// checkBlockProofOfStake
+func (b *BlockChain) checkBlockProofOfStake(block *btcutil.Block) error {
+
+	if block.MsgBlock().IsProofOfStake() {
+
+		blockHash, err := block.Sha()
+		if err != nil { return err }
+		log.Tracef("Block %v is PoS", blockHash)
+
+		tx, err := block.Tx(1)
+		if err != nil { return err }
+
+		hashProofOfStake, err :=
+			b.checkTxProofOfStake(tx, block.MsgBlock().Header.Bits)
+		if err != nil {
+			str := fmt.Sprintf("Proof of stake check failed for block %v : %v", blockHash, err)
+			return ruleError(ErrProofOfStakeCheck, str)
+		} else {
+			SetProofOfStake(block.Meta(), true) // Important: flags
+			block.Meta().HashProofOfStake = *hashProofOfStake
+			log.Debugf("Proof of stake for block %v = %v", blockHash, hashProofOfStake)
+		}
+
+	}
+
+	return nil
+}
+
 // Check whether the coinstake timestamp meets protocol
 // called from main.cpp
 func (b *BlockChain) CheckCoinStakeTimestamp(

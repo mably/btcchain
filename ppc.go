@@ -230,32 +230,6 @@ func SetStakeEntropyBit(meta *btcwire.Meta, entropyBit uint32) {
 	}
 }
 
-// checkProofOfStake
-func (b *BlockChain) checkBlockProofOfStake(block *btcutil.Block) error {
-	if block.MsgBlock().IsProofOfStake() {
-		blockHash, err := block.Sha()
-		if err != nil {
-			return err
-		}
-		log.Tracef("Block %v is PoS", blockHash)
-		tx, err := block.Tx(1)
-		if err != nil {
-			return err
-		}
-		hashProofOfStake, err :=
-			b.checkTxProofOfStake(tx, block.MsgBlock().Header.Bits)
-		if err != nil {
-			str := fmt.Sprintf("Proof of stake check failed for block %v : %v", blockHash, err)
-			return ruleError(ErrProofOfStakeCheck, str)
-		} else {
-			SetProofOfStake(block.Meta(), true) // Important: flags
-			block.Meta().HashProofOfStake = *hashProofOfStake
-			log.Debugf("Proof of stake for block %v = %v", blockHash, hashProofOfStake)
-		}
-	}
-	return nil
-}
-
 // BigToShaHash converts a big.Int into a btcwire.ShaHash.
 func BigToShaHash(value *big.Int) (*btcwire.ShaHash, error) {
 
