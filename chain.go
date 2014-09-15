@@ -13,10 +13,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/conformal/btcdb"
-	"github.com/conformal/btcnet"
-	"github.com/conformal/btcutil"
-	"github.com/conformal/btcwire"
+	"github.com/mably/btcdb"
+	"github.com/mably/btcnet"
+	"github.com/mably/btcutil"
+	"github.com/mably/btcwire"
 )
 
 const (
@@ -29,6 +29,11 @@ const (
 	// to determine when it's safe to prune nodes from memory without
 	// causing constant dynamic reloading.
 	minMemoryNodes = BlocksPerRetarget
+
+	// Peercoin blockNode flags
+	FBlockProofOfStake  = uint32(1 << 0)
+	FBlockStakeEntropy  = uint32(1 << 1) // entropy bit for stake modifier
+	FBlockStakeModifier = uint32(1 << 2) // regenerated stake modifier
 )
 
 // ErrIndexAlreadyInitialized describes an error that indicates the block index
@@ -73,6 +78,9 @@ type blockNode struct {
 	version   int32
 	bits      uint32
 	timestamp time.Time
+
+	// Peercoin specific
+	meta *btcwire.Meta
 }
 
 // newBlockNode returns a new block node for the given block header.  It is
@@ -109,8 +117,10 @@ type orphanBlock struct {
 // inserted from the database into the memory chain prior to nodes we already
 // have and update their work values accordingly.
 func addChildrenWork(node *blockNode, work *big.Int) {
+	defer timeTrack(now(), fmt.Sprintf("addChildrenWork(%v)", node.hash))
 	for _, childNode := range node.children {
 		childNode.workSum.Add(childNode.workSum, work)
+		log.Debugf("Child node = %v", childNode)
 		addChildrenWork(childNode, work)
 	}
 }
@@ -401,18 +411,20 @@ func (b *BlockChain) GenerateInitialIndex() error {
 // are needed to avoid needing to put the entire block chain in memory.
 func (b *BlockChain) loadBlockNode(hash *btcwire.ShaHash) (*blockNode, error) {
 	// Load the block header and height from the db.
-	blockHeader, err := b.db.FetchBlockHeaderBySha(hash)
-	if err != nil {
-		return nil, err
-	}
-	blockHeight, err := b.db.FetchBlockHeightBySha(hash)
-	if err != nil {
-		return nil, err
-	}
+	defer timeTrack(now(), fmt.Sprintf("loadBlockNode(%v)", hash))
 
-	// Create the new block node for the block and set the work.
-	node := newBlockNode(blockHeader, hash, blockHeight)
+	blockHeader, meta, err := b.db.FetchBlockHeaderBySha(hash)
+	if err != nil {
+		return nil, err
+	}
+	blockHeight, err := b.db.FetchBlockHeightBySha(hash) // TODO
+	if err != nil {
+		return nil, err
+	}
+	// Create the new block node for the block and set the work. peercoin
+	node := ppcNewBlockNode(blockHeader, hash, blockHeight, meta)
 	node.inMainChain = true
+	node.workSum = new(big.Int).Set(&meta.ChainTrust) // peercoin
 
 	// Add the node to the chain.
 	// There are several possibilities here:
@@ -424,17 +436,20 @@ func (b *BlockChain) loadBlockNode(hash *btcwire.ShaHash) (*blockNode, error) {
 	//  4) Neither 1 or 2 is true, but this is the first node being added
 	//     to the tree, so it's the root.
 	prevHash := &blockHeader.PrevBlock
-	if parentNode, ok := b.index[*prevHash]; ok {
+	parentNode, ok := b.index[*prevHash]
+	log.Debugf("height = %d, prevHash = %v, parentNode = %v, ok = %v", blockHeight, prevHash, parentNode, ok)
+	if ok {
 		// Case 1 -- This node is a child of an existing block node.
 		// Update the node's work sum with the sum of the parent node's
 		// work sum and this node's work, append the node as a child of
 		// the parent node and set this node's parent to the parent
 		// node.
-		node.workSum = node.workSum.Add(parentNode.workSum, node.workSum)
+		//node.workSum = node.workSum.Add(parentNode.workSum, node.workSum)
 		parentNode.children = append(parentNode.children, node)
 		node.parent = parentNode
 
 	} else if childNodes, ok := b.depNodes[*hash]; ok {
+
 		// Case 2 -- This node is the parent of one or more nodes.
 		// Connect this block node to all of its children and update
 		// all of the children (and their children) with the new work
@@ -442,7 +457,7 @@ func (b *BlockChain) loadBlockNode(hash *btcwire.ShaHash) (*blockNode, error) {
 		for _, childNode := range childNodes {
 			childNode.parent = node
 			node.children = append(node.children, childNode)
-			addChildrenWork(childNode, node.workSum)
+			//addChildrenWork(childNode, node.workSum)
 			b.root = node
 		}
 
@@ -745,12 +760,19 @@ func (b *BlockChain) getReorganizeNodes(node *blockNode) (*list.List, *list.List
 // connectBlock handles connecting the passed node/block to the end of the main
 // (best) chain.
 func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block) error {
+
+	defer timeTrack(now(), fmt.Sprintf("connectBlock(%v)", slice(block.Sha())[0]))
+
 	// Make sure it's extending the end of the best chain.
 	prevHash := &block.MsgBlock().Header.PrevBlock
 	if b.bestChain != nil && !prevHash.IsEqual(b.bestChain.hash) {
 		return fmt.Errorf("connectBlock must be called with a block " +
 			"that extends the main chain")
 	}
+
+	// peercoin
+	block.Meta().ChainTrust = *node.workSum
+	//log.Debugf("Block %v trust = %v", node.height, node.workSum)
 
 	// Insert the block into the database which houses the main chain.
 	_, err := b.db.InsertBlock(block)
@@ -911,6 +933,9 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List, flags 
 //    state of the memory chain index.  Also, any log messages related to
 //    modifying the state are avoided.
 func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, flags BehaviorFlags) error {
+
+	defer timeTrack(now(), fmt.Sprintf("connectBestChain(%v)", slice(block.Sha())[0]))
+
 	fastAdd := flags&BFFastAdd == BFFastAdd
 	dryRun := flags&BFDryRun == BFDryRun
 
@@ -981,7 +1006,8 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 
 	// We're extending (or creating) a side chain, but the cumulative
 	// work for this new side chain is not enough to make it the new chain.
-	if node.workSum.Cmp(b.bestChain.workSum) <= 0 {
+	if node.workSum.Cmp(b.bestChain.workSum) <= 0 { // TODO peercoin: workSum == meta.chainTrust? dup?
+
 		// Skip Logging info when the dry run flag is set.
 		if dryRun {
 			return nil

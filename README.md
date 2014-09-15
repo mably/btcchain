@@ -1,8 +1,9 @@
 btcchain
 ========
 
-[![Build Status](https://travis-ci.org/conformal/btcchain.png?branch=master)]
-(https://travis-ci.org/conformal/btcchain)
+[![Build Status](https://travis-ci.org/mably/btcchain.png?branch=master)]
+(https://travis-ci.org/mably/btcchain)
+[![tip for next commit](http://peer4commit.com/projects/130.svg)](http://peer4commit.com/projects/130)
 
 Package btcchain implements bitcoin block handling and chain selection rules.
 The test coverage is currently only around 60%, but will be increasing over
@@ -21,21 +22,21 @@ handle processing of blocks into the bitcoin block chain.
 
 ## Documentation
 
-[![GoDoc](https://godoc.org/github.com/conformal/btcchain?status.png)]
-(http://godoc.org/github.com/conformal/btcchain)
+[![GoDoc](https://godoc.org/github.com/mably/btcchain?status.png)]
+(http://godoc.org/github.com/mably/btcchain)
 
 Full `go doc` style documentation for the project can be viewed online without
 installing this package by using the GoDoc site here:
-http://godoc.org/github.com/conformal/btcchain
+http://godoc.org/github.com/mably/btcchain
 
 You can also view the documentation locally once the package is installed with
 the `godoc` tool by running `godoc -http=":6060"` and pointing your browser to
-http://localhost:6060/pkg/github.com/conformal/btcchain
+http://localhost:6060/pkg/github.com/mably/btcchain
 
 ## Installation
 
 ```bash
-$ go get github.com/conformal/btcchain
+$ go get github.com/mably/btcchain
 ```
 
 ## Bitcoin Chain Processing Overview

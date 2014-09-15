@@ -14,7 +14,7 @@ package btcchain
 import (
 	"time"
 
-	"github.com/conformal/btcutil"
+	"github.com/mably/btcutil"
 )
 
 // TstSetCoinbaseMaturity makes the ability to set the coinbase maturity

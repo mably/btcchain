@@ -7,8 +7,8 @@ package btcchain
 import (
 	"math"
 
-	"github.com/conformal/btcutil"
-	"github.com/conformal/btcwire"
+	"github.com/mably/btcutil"
+	"github.com/mably/btcwire"
 )
 
 // nextPowerOfTwo returns the next highest power of two from a given number if

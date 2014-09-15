@@ -7,7 +7,7 @@ package btcchain
 import (
 	"fmt"
 
-	"github.com/conformal/btcutil"
+	"github.com/mably/btcutil"
 )
 
 // maybeAcceptBlock potentially accepts a block into the memory block chain.
@@ -20,6 +20,9 @@ import (
 //  - BFDryRun: The memory chain index will not be pruned and no accept
 //    notification will be sent since the block is not being accepted.
 func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, flags BehaviorFlags) error {
+
+	defer timeTrack(now(), fmt.Sprintf("maybeAcceptBlock(%v)", slice(block.Sha())[0]))
+
 	fastAdd := flags&BFFastAdd == BFFastAdd
 	dryRun := flags&BFDryRun == BFDryRun
 
@@ -44,13 +47,14 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, flags BehaviorFlags)
 		// Ensure the difficulty specified in the block header matches
 		// the calculated difficulty based on the previous block and
 		// difficulty retarget rules.
-		expectedDifficulty, err := b.calcNextRequiredDifficulty(prevNode,
-			block.MsgBlock().Header.Timestamp)
+		expectedDifficulty, err := b.ppcCalcNextRequiredDifficulty(
+			prevNode, block.IsProofOfStake())
 		if err != nil {
 			return err
 		}
 		blockDifficulty := blockHeader.Bits
 		if blockDifficulty != expectedDifficulty {
+			log.Infof("maybeAcceptBlock : block %v, prevNode %v(%d)", btcutil.Slice(block.Sha())[0], prevNode.hash, prevNode.bits)
 			str := "block difficulty of %d is not the expected value of %d"
 			str = fmt.Sprintf(str, blockDifficulty, expectedDifficulty)
 			return ruleError(ErrUnexpectedDifficulty, str)
@@ -63,10 +67,11 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, flags BehaviorFlags)
 			log.Errorf("calcPastMedianTime: %v", err)
 			return err
 		}
-		if !blockHeader.Timestamp.After(medianTime) {
+		// TODO(kac-) check why
+		// !blockHeader.Timestamp.After(medianTime)
+		if blockHeader.Timestamp.Before(medianTime) {
 			str := "block timestamp of %v is not after expected %v"
-			str = fmt.Sprintf(str, blockHeader.Timestamp,
-				medianTime)
+			str = fmt.Sprintf(str, blockHeader.Timestamp, medianTime)
 			return ruleError(ErrTimeTooOld, str)
 		}
 
@@ -126,8 +131,7 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, flags BehaviorFlags)
 		// newer once a majority of the network has upgraded.  This is
 		// part of BIP0034.
 		if blockHeader.Version >= serializedHeightVersion {
-			if b.isMajorityVersion(serializedHeightVersion,
-				prevNode,
+			if b.isMajorityVersion(serializedHeightVersion, prevNode,
 				b.netParams.CoinbaseBlockHeightNumRequired,
 				b.netParams.CoinbaseBlockHeightNumToCheck) {
 
@@ -136,8 +140,7 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, flags BehaviorFlags)
 					expectedHeight = prevNode.height + 1
 				}
 				coinbaseTx := block.Transactions()[0]
-				err := checkSerializedHeight(coinbaseTx,
-					expectedHeight)
+				err := checkSerializedHeight(coinbaseTx, expectedHeight)
 				if err != nil {
 					return err
 				}
@@ -154,12 +157,20 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, flags BehaviorFlags)
 		}
 	}
 
+	// ppcoin: populate all ppcoin specific block meta data
+	err = b.AddToBlockIndex(block)
+	if err != nil {
+		return err
+	}
+
 	// Create a new block node for the block and add it to the in-memory
 	// block chain (could be either a side chain or the main chain).
-	newNode := newBlockNode(blockHeader, blockHash, blockHeight)
-	if prevNode != nil {
+	newNode := ppcNewBlockNode(
+		blockHeader, blockHash, blockHeight, block.Meta()) // peercoin
+	if prevNode != nil { // Not genesis block
 		newNode.parent = prevNode
 		newNode.height = blockHeight
+		// newNode.workSum has been initialied to block trust in ppcNewBlockNode
 		newNode.workSum.Add(prevNode.workSum, newNode.workSum)
 	}
 

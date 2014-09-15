@@ -7,8 +7,8 @@ package btcchain
 import (
 	"fmt"
 
-	"github.com/conformal/btcutil"
-	"github.com/conformal/btcwire"
+	"github.com/mably/btcutil"
+	"github.com/mably/btcwire"
 )
 
 // BehaviorFlags is a bitmask defining tweaks to the normal behavior when
@@ -56,6 +56,9 @@ func (b *BlockChain) blockExists(hash *btcwire.ShaHash) (bool, error) {
 // The flags do not modify the behavior of this function directly, however they
 // are needed to pass along to maybeAcceptBlock.
 func (b *BlockChain) processOrphans(hash *btcwire.ShaHash, flags BehaviorFlags) error {
+
+	defer timeTrack(now(), fmt.Sprintf("processOrphans(%v)", hash))
+
 	// Start with processing at least the passed hash.  Leave a little room
 	// for additional orphan blocks that need to be processed without
 	// needing to grow the array in the common case.
@@ -115,6 +118,9 @@ func (b *BlockChain) processOrphans(hash *btcwire.ShaHash, flags BehaviorFlags) 
 // any errors that occurred during processing.  The returned bool is only valid
 // when the error is nil.
 func (b *BlockChain) ProcessBlock(block *btcutil.Block, flags BehaviorFlags) (bool, error) {
+
+	defer timeTrack(now(), fmt.Sprintf("ProcessBlock(%v)", slice(block.Sha())[0]))
+
 	fastAdd := flags&BFFastAdd == BFFastAdd
 	dryRun := flags&BFDryRun == BFDryRun
 
@@ -142,6 +148,13 @@ func (b *BlockChain) ProcessBlock(block *btcutil.Block, flags BehaviorFlags) (bo
 
 	// Perform preliminary sanity checks on the block and its transactions.
 	err = checkBlockSanity(block, b.netParams.PowLimit, flags)
+	if err != nil {
+		return false, err
+	}
+
+	// ppcoin: verify hash target and signature of coinstake tx
+	// TODO is it the best place to do that?
+	err = b.checkBlockProofOfStake(block)
 	if err != nil {
 		return false, err
 	}
@@ -174,6 +187,7 @@ func (b *BlockChain) ProcessBlock(block *btcutil.Block, flags BehaviorFlags) (bo
 			// check ensures the proof of work is at least the minimum
 			// expected based on elapsed time since the last checkpoint and
 			// maximum adjustment allowed by the retarget rules.
+			/* TODO peercoin : disabled
 			duration := blockHeader.Timestamp.Sub(checkpointTime)
 			requiredTarget := CompactToBig(b.calcEasiestDifficulty(
 				checkpointHeader.Bits, duration))
@@ -183,7 +197,7 @@ func (b *BlockChain) ProcessBlock(block *btcutil.Block, flags BehaviorFlags) (bo
 					"is too low when compared to the previous "+
 					"checkpoint", currentTarget)
 				return false, ruleError(ErrDifficultyTooLow, str)
-			}
+			}*/
 		}
 	}
 
@@ -200,7 +214,6 @@ func (b *BlockChain) ProcessBlock(block *btcutil.Block, flags BehaviorFlags) (bo
 					blockHash, prevHash)
 				b.addOrphanBlock(block)
 			}
-
 			return true, nil
 		}
 	}
