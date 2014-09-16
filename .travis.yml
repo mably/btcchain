@@ -3,7 +3,7 @@ go:
   - release
   - tip
 install:
-  - go get -d -t -u -v ./...
+  - go get -d -t -v ./...
   - go get -v code.google.com/p/go.tools/cmd/cover
 script:
   - go test -v -covermode=count -coverprofile=profile.cov
