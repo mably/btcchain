@@ -31,16 +31,6 @@ const (
 	MaxClockDrift          int64 = 2 * 60 * 60       // two hours (main.h)
 )
 
-var (
-	// Hard checkpoints of stake modifiers to ensure they are deterministic
-	mapStakeModifierCheckpoints map[int64]uint32 = map[int64]uint32{
-		0:     uint32(0x0e00670b),
-		19080: uint32(0xad4e4d29),
-		30583: uint32(0xdc7bf136),
-		99999: uint32(0xf555cfd2),
-	}
-)
-
 type blockTimeHash struct {
 	time int64
 	hash *btcwire.ShaHash
@@ -787,7 +777,7 @@ func (b *BlockChain) CheckStakeModifierCheckpoints(
 	if b.netParams.Name == "testnet3" {
 		return true // Testnet has no checkpoints
 	}
-	if checkpoint, ok := mapStakeModifierCheckpoints[nHeight]; ok {
+	if checkpoint, ok := b.netParams.StakeModifierCheckpoints[nHeight]; ok {
 		return nStakeModifierChecksum == checkpoint
 	}
 	return true
