@@ -126,6 +126,14 @@ func (b *BlockChain) PPCCalcNextRequiredDifficulty(proofOfStake bool) (uint32, e
 	return b.ppcCalcNextRequiredDifficulty(b.bestChain, proofOfStake)
 }
 
+// SetCoinbaseMaturity sets required coinbase maturity and return old one
+// Required for tests
+func (b *BlockChain) SetCoinbaseMaturity(coinbaseMaturity int64)(old int64){
+	old = b.netParams.CoinbaseMaturity
+	b.netParams.CoinbaseMaturity = coinbaseMaturity
+	return
+}
+
 // CalcTrust calculates a work value from difficulty bits.  Bitcoin increases
 // the difficulty for generating a block by decreasing the value which the
 // generated hash must be less than.  This difficulty target is stored in each

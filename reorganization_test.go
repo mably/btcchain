@@ -56,7 +56,12 @@ func TestReorganization(t *testing.T) {
 	// Since we're not dealing with the real block chain, disable
 	// checkpoints and set the coinbase maturity to 1.
 	chain.DisableCheckpoints(true)
-	btcchain.TstSetCoinbaseMaturity(1)
+	// Peercoin
+	// btcchain.TstSetCoinbaseMaturity(1)
+	originalMaturity := chain.SetCoinbaseMaturity(1)
+	defer func(){
+		chain.SetCoinbaseMaturity(originalMaturity)
+	}()
 
 	expectedOrphans := map[int]struct{}{5: struct{}{}, 6: struct{}{}}
 	for i := 1; i < len(blocks); i++ {

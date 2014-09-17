@@ -17,11 +17,14 @@ import (
 	"github.com/mably/btcutil"
 )
 
+/* Peercoin - now it's btcnet.Params parameter
+
 // TstSetCoinbaseMaturity makes the ability to set the coinbase maturity
 // available to the test package.
 func TstSetCoinbaseMaturity(maturity int64) {
 	coinbaseMaturity = maturity
 }
+*/
 
 // TstTimeSorter makes the internal timeSorter type available to the test
 // package.
