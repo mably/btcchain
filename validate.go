@@ -900,22 +900,24 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block) er
 		}
 	}
 
-	// The total output values of the coinbase transaction must not exceed
-	// the expected subsidy value plus total transaction fees gained from
-	// mining the block.  It is safe to ignore overflow and out of range
-	// errors here because those error conditions would have already been
-	// caught by checkTransactionSanity.
-	var totalSatoshiOut int64
-	for _, txOut := range transactions[0].MsgTx().TxOut {
-		totalSatoshiOut += txOut.Value
-	}
-	expectedSatoshiOut := CalcBlockSubsidy(node.height, b.netParams) +
-		totalFees
-	if totalSatoshiOut > expectedSatoshiOut {
-		str := fmt.Sprintf("coinbase transaction for block pays %v "+
-			"which is more than expected value of %v",
-			totalSatoshiOut, expectedSatoshiOut)
-		return ruleError(ErrBadCoinbaseValue, str)
+	if !node.IsProofOfStake() {
+		// The total output values of the coinbase transaction must not exceed
+		// the expected subsidy value plus total transaction fees gained from
+		// mining the block.  It is safe to ignore overflow and out of range
+		// errors here because those error conditions would have already been
+		// caught by checkTransactionSanity.
+		var totalSatoshiOut int64
+		for _, txOut := range transactions[0].MsgTx().TxOut {
+			totalSatoshiOut += txOut.Value
+		}
+		expectedSatoshiOut := PPCGetProofOfWorkReward(node.bits, b.netParams) +
+			totalFees
+		if totalSatoshiOut > expectedSatoshiOut {
+			str := fmt.Sprintf("coinbase transaction for block pays %v "+
+				"which is more than expected value of %v",
+				totalSatoshiOut, expectedSatoshiOut)
+			return ruleError(ErrBadCoinbaseValue, str)
+		}
 	}
 
 	// Don't run scripts if this node is before the latest known good
