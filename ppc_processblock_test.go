@@ -19,7 +19,7 @@ import (
 	"strings"
 )
 
-func TestPPCProcessBlocks(t *testing.T) {
+func OffTestPPCProcessBlocks(t *testing.T) {
 	activeNetParams := btcnet.MainNetParams
 	dbbc, err := btcdb.CreateDB("memdb")
 	genesis := btcutil.NewBlockWithMetas(
