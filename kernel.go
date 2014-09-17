@@ -48,6 +48,18 @@ func (s blockTimeHashSorter) Swap(i, j int) {
 // Less returns whether the timstamp with index i should sort before the
 // timestamp with index j.  It is part of the sort.Interface implementation.
 func (s blockTimeHashSorter) Less(i, j int) bool {
+	if s[i].time == s[j].time {
+		bi := s[i].hash.Bytes()
+		bj := s[j].hash.Bytes()
+		for k := 0; k < btcwire.HashSize; k++ {
+			if bi[k] < bj[k] {
+				return true
+			} else if bi[k] > bj[k] {
+				return false
+			}
+		}
+		return false
+	}
 	return s[i].time < s[j].time
 }
 
