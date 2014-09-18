@@ -6,6 +6,7 @@ package btcchain
 
 import (
 	"fmt"
+	"github.com/mably/btcnet"
 	"github.com/mably/btcutil"
 	"github.com/mably/btcwire"
 	"math/big"
@@ -16,6 +17,14 @@ const (
 	InitialHashTargetBits uint32 = 0x1c00ffff
 	TargetSpacingWorkMax  int64  = StakeTargetSpacing * 12
 	TargetTimespan        int64  = 7 * 24 * 60 * 60
+
+	Cent               int64 = 10000
+	Coin               int64 = 100 * Cent
+	MinTxFee           int64 = Cent
+	MinRelayTxFee      int64 = Cent
+	MaxMoney           int64 = 2000000000 * Coin
+	MaxMintProofOfWork int64 = 9999 * Coin
+	MinTxOutAmount     int64 = MinTxFee
 )
 
 var ZeroSha = btcwire.ShaHash{}
@@ -90,12 +99,12 @@ func (b *BlockChain) ppcCalcNextRequiredDifficulty(lastNode *blockNode, proofOfS
 
 	prev := b.GetLastBlockIndex(lastNode, proofOfStake)
 	if prev.hash.IsEqual(b.netParams.GenesisHash) {
-		return InitialHashTargetBits, nil // first block
+		return b.netParams.InitialHashTargetBits, nil // first block
 	}
 	prevParent, _ := b.getPrevNodeFromNode(prev)
 	prevPrev := b.GetLastBlockIndex(prevParent, proofOfStake)
 	if prevPrev.hash.IsEqual(b.netParams.GenesisHash) {
-		return InitialHashTargetBits, nil // second block
+		return b.netParams.InitialHashTargetBits, nil // second block
 	}
 
 	actualSpacing := prev.timestamp.Unix() - prevPrev.timestamp.Unix()
@@ -130,6 +139,14 @@ func (b *BlockChain) ppcCalcNextRequiredDifficulty(lastNode *blockNode, proofOfS
 // This function is NOT safe for concurrent access.
 func (b *BlockChain) PPCCalcNextRequiredDifficulty(proofOfStake bool) (uint32, error) {
 	return b.ppcCalcNextRequiredDifficulty(b.bestChain, proofOfStake)
+}
+
+// SetCoinbaseMaturity sets required coinbase maturity and return old one
+// Required for tests
+func (b *BlockChain) SetCoinbaseMaturity(coinbaseMaturity int64) (old int64) {
+	old = b.netParams.CoinbaseMaturity
+	b.netParams.CoinbaseMaturity = coinbaseMaturity
+	return
 }
 
 // CalcTrust calculates a work value from difficulty bits.  Bitcoin increases
@@ -255,4 +272,40 @@ func BigToShaHash(value *big.Int) (*btcwire.ShaHash, error) {
 	}
 
 	return btcwire.NewShaHash(pbuf)
+}
+
+// https://github.com/ppcoin/ppcoin/blob/v0.4.0ppc/src/main.cpp#L829
+func PPCGetProofOfWorkReward(nBits uint32, netParams *btcnet.Params) (subsidy int64) {
+	bigTwo := new(big.Int).SetInt64(2)
+	bnSubsidyLimit := new(big.Int).SetInt64(MaxMintProofOfWork)
+	bnTarget := CompactToBig(nBits)
+	bnTargetLimit := netParams.PowLimit
+	// TODO(kac-) wat? bnTargetLimit.SetCompact(bnTargetLimit.GetCompact());
+	bnTargetLimit = CompactToBig(BigToCompact(bnTargetLimit))
+	// ppcoin: subsidy is cut in half every 16x multiply of difficulty
+	// A reasonably continuous curve is used to avoid shock to market
+	// (nSubsidyLimit / nSubsidy) ** 4 == bnProofOfWorkLimit / bnTarget
+	bnLowerBound := new(big.Int).SetInt64(Cent)
+	bnUpperBound := new(big.Int).Set(bnSubsidyLimit)
+	for new(big.Int).Add(bnLowerBound, new(big.Int).SetInt64(Cent)).Cmp(bnUpperBound) <= 0 {
+		bnMidValue := new(big.Int).Div(new(big.Int).Add(bnLowerBound, bnUpperBound), bigTwo)
+		/*
+			if (fDebug && GetBoolArg("-printcreation"))
+			printf("GetProofOfWorkReward() : lower=%"PRI64d" upper=%"PRI64d" mid=%"PRI64d"\n", bnLowerBound.getuint64(), bnUpperBound.getuint64(), bnMidValue.getuint64());
+		*/
+		mid := new(big.Int).Set(bnMidValue)
+		sub := new(big.Int).Set(bnSubsidyLimit)
+		//if (bnMidValue * bnMidValue * bnMidValue * bnMidValue * bnTargetLimit > bnSubsidyLimit * bnSubsidyLimit * bnSubsidyLimit * bnSubsidyLimit * bnTarget)
+		if mid.Mul(mid, mid).Mul(mid, mid).Mul(mid, bnTargetLimit).Cmp(sub.Mul(sub, sub).Mul(sub, sub).Mul(sub, bnTarget)) > 0 {
+			bnUpperBound = bnMidValue
+		} else {
+			bnLowerBound = bnMidValue
+		}
+	}
+	subsidy = bnUpperBound.Int64()
+	subsidy = (subsidy / Cent) * Cent
+	if subsidy > MaxMintProofOfWork {
+		subsidy = MaxMintProofOfWork
+	}
+	return
 }
