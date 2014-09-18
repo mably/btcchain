@@ -37,15 +37,6 @@ func (b *BlockChain) AddToBlockIndex(block *btcutil.Block) (err error) {
 
 	meta := block.Meta()
 
-	// ppcoin: compute chain trust score TODO needed here?
-	blockTrust := getBlockTrust(block)
-	prevNode, err := b.getPrevNodeFromBlock(block)
-	if err != nil || prevNode == nil {
-		meta.ChainTrust.Set(blockTrust)
-	} else {
-		meta.ChainTrust.Add(&prevNode.meta.ChainTrust, blockTrust)
-	}
-
 	// ppcoin: compute stake entropy bit for stake modifier
 	stakeEntropyBit, err := getStakeEntropyBit(b, block)
 	if err != nil {
