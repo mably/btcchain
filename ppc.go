@@ -32,19 +32,25 @@ var ZeroSha = btcwire.ShaHash{}
 // getBlockNode try to obtain a node form the memory block chain and loads it
 // form the database in not found in memory.
 func (b *BlockChain) getBlockNode(hash *btcwire.ShaHash) (*blockNode, error) {
-
+	if hash.IsEqual(zeroHash) {
+		return nil, nil
+	}
 	// Return the existing previous block node if it's already there.
 	if bn, ok := b.index[*hash]; ok {
 		return bn, nil
 	}
 
-	// Dynamically load the previous block from the block database, create
-	// a new block node for it, and update the memory chain accordingly.
-	prevBlockNode, err := b.loadBlockNode(hash)
-	if err != nil {
-		return nil, err
+	for !b.root.parentHash.IsEqual(hash) {
+		_, err := b.getPrevNodeFromNode(b.root)
+		if err != nil {
+			return nil, log.Errorf("filling blockchain index for %v, error in %v: %v", hash, b.root.height, err)
+		}
 	}
-	return prevBlockNode, nil
+	if b.root.parentHash.IsEqual(hash) {
+		log.Infof("new index root height %v, index length %v", b.root.height, b.bestChain.height-b.root.height)
+		return b.root, nil
+	}
+	panic("totally unexpected")
 }
 
 // https://github.com/ppcoin/ppcoin/blob/v0.4.0ppc/src/main.cpp#L894

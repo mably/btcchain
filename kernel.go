@@ -362,51 +362,48 @@ func (b *BlockChain) GetKernelStakeModifier(
 	//log.Debugf("GetKernelStakeModifier : blockFrom = %v", hashBlockFrom)
 
 	nStakeModifier = 0
-	blockFrom, metaFrom, fetchErr := b.db.FetchBlockHeaderBySha(hashBlockFrom)
+	blockFrom, fetchErr := b.getBlockNode(hashBlockFrom)
 	if fetchErr != nil {
 		err = fmt.Errorf("GetKernelStakeModifier() : block not found (%v)", fetchErr)
 		return
 	}
-	blockFromHeight, fetchErr := b.db.FetchBlockHeightBySha(hashBlockFrom)
-	if fetchErr != nil {
-		err = fmt.Errorf("GetKernelStakeModifier() : block height not found (%v)", fetchErr)
-		return
-	}
+	blockFromHeight := blockFrom.height
 	nStakeModifierHeight = int32(blockFromHeight)
-	blockFromTimestamp := blockFrom.Timestamp.Unix()
+	blockFromTimestamp := blockFrom.timestamp.Unix()
 	nStakeModifierTime = blockFromTimestamp
 	var nStakeModifierSelectionInterval int64 = getStakeModifierSelectionInterval(b)
-	var block *btcwire.BlockHeader = blockFrom
-	var blockHeight int64 = blockFromHeight
-	var meta *btcwire.Meta = metaFrom
+	var block *blockNode = blockFrom
 	var blockSha *btcwire.ShaHash
 	// loop to find the stake modifier later by a selection interval
 	for nStakeModifierTime < (blockFromTimestamp + nStakeModifierSelectionInterval) {
-		if blockHeight >= b.bestChain.height { // reached best block; may happen if node is behind on block chain
-			blockTimestamp := block.Timestamp.Unix()
+		if block.height >= b.bestChain.height { // reached best block; may happen if node is behind on block chain
+			blockTimestamp := block.timestamp.Unix()
 			if fPrintProofOfStake || (blockTimestamp+b.netParams.StakeMinAge-nStakeModifierSelectionInterval > getAdjustedTime()) {
 				err = fmt.Errorf("GetKernelStakeModifier() : reached best block %v at height %v from block %v",
-					btcutil.Slice(blockSha)[0], blockHeight, hashBlockFrom)
+					btcutil.Slice(blockSha)[0], block.height, hashBlockFrom)
 				return
 			} else {
 				return
 			}
 		}
-		blockSha, err = b.db.FetchBlockShaByHeight(blockHeight + 1)
-		if err != nil {
+		var nextBlockNode *blockNode
+		for _, ch := range block.children{
+			if ch.inMainChain {
+				nextBlockNode = ch
+				break
+			}
+		}
+		if nextBlockNode == nil {
+			err = fmt.Errorf("now block node higher than %v %v", block.height, block.hash)
 			return
 		}
-		block, meta, err = b.db.FetchBlockHeaderBySha(blockSha)
-		if err != nil {
-			return
-		}
-		blockHeight += 1
-		if IsGeneratedStakeModifier(meta) {
-			nStakeModifierHeight = int32(blockHeight)
-			nStakeModifierTime = block.Timestamp.Unix()
+		block = nextBlockNode
+		if IsGeneratedStakeModifier(block.meta) {
+			nStakeModifierHeight = int32(block.height)
+			nStakeModifierTime = block.timestamp.Unix()
 		}
 	}
-	nStakeModifier = meta.StakeModifier
+	nStakeModifier = block.meta.StakeModifier
 	return
 }
 
