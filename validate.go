@@ -902,16 +902,14 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block) er
 
 	if !node.IsProofOfStake() {
 		// The total output values of the coinbase transaction must not exceed
-		// the expected subsidy value plus total transaction fees gained from
-		// mining the block.  It is safe to ignore overflow and out of range
+		// the expected subsidy value.  It is safe to ignore overflow and out of range
 		// errors here because those error conditions would have already been
 		// caught by checkTransactionSanity.
 		var totalSatoshiOut int64
 		for _, txOut := range transactions[0].MsgTx().TxOut {
 			totalSatoshiOut += txOut.Value
 		}
-		expectedSatoshiOut := PPCGetProofOfWorkReward(node.bits, b.netParams) +
-			totalFees
+		expectedSatoshiOut := PPCGetProofOfWorkReward(node.bits, b.netParams)
 		if totalSatoshiOut > expectedSatoshiOut {
 			str := fmt.Sprintf("coinbase transaction for block pays %v "+
 				"which is more than expected value of %v",
