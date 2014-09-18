@@ -169,6 +169,64 @@ func CalcTrust(bits uint32, proofOfStake bool) *big.Int {
 	return new(big.Int).Div(oneLsh256, denominator)
 }
 
+func (b *BlockChain) CalcMintAndMoneySupply(node *blockNode, block *btcutil.Block) error {
+
+    var nFees int64 = 0
+    var nValueIn int64 = 0
+    var nValueOut int64 = 0
+
+    txStore, err := b.fetchInputTransactions(node, block)
+	if err != nil {
+		return err
+	}
+
+	transactions := block.Transactions()
+	for _, tx := range transactions {
+
+		var nTxValueOut int64 = 0
+		for _, txOut := range tx.MsgTx().TxOut {
+			nTxValueOut += txOut.Value
+		}
+
+        if IsCoinBase(tx) {
+            nValueOut += nTxValueOut
+        } else {
+			var nTxValueIn int64 = 0
+			for _, txIn := range tx.MsgTx().TxIn {
+				txInHash := &txIn.PreviousOutpoint.Hash
+				originTx, _ := txStore[*txInHash]
+				originTxIndex := txIn.PreviousOutpoint.Index
+				originTxSatoshi := originTx.Tx.MsgTx().TxOut[originTxIndex].Value
+				nTxValueIn += originTxSatoshi
+			}
+            nValueIn += nTxValueIn
+            nValueOut += nTxValueOut
+            if !IsCoinStake(tx) {
+                nFees += nTxValueIn - nTxValueOut
+			}
+        }
+    }
+
+	log.Debugf("height = %v, nValueIn = %v, nValueOut = %v, nFees = %v", block.Height(), nValueIn, nValueOut, nFees)
+
+    // ppcoin: track money supply and mint amount info
+    block.Meta().Mint = nValueOut - nValueIn + nFees
+	var prevNode *blockNode
+    prevNode, err = b.getPrevNodeFromNode(node)
+    if err != nil {
+		return err
+	}
+    if prevNode == nil {
+    	block.Meta().MoneySupply = nValueOut - nValueIn
+    } else {
+    	block.Meta().MoneySupply = prevNode.meta.MoneySupply + nValueOut - nValueIn
+    }
+
+	log.Debugf("height = %v, mint = %v, moneySupply = %v", block.Height(), block.Meta().Mint, block.Meta().MoneySupply)
+
+    return nil
+}
+
 // IsCoinStake determines whether or not a transaction is a coinstake.  A coinstake
 // is a special transaction created by peercoin minters.
 func IsCoinStake(tx *btcutil.Tx) bool {
