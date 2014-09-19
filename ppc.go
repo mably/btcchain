@@ -463,6 +463,15 @@ func PPCGetProofOfWorkReward(nBits uint32, netParams *btcnet.Params) (subsidy in
 	return
 }
 
+// GetMinFee calculates minimum required required for transaction.
+// https://github.com/ppcoin/ppcoin/blob/v0.4.0ppc/src/main.h#L592
+func GetMinFee(tx *btcutil.Tx) int64 {
+	baseFee := MinTxFee
+	bytes := tx.MsgTx().SerializeSize()
+	minFee := (1 + int64(bytes)/1000) * baseFee
+	return minFee
+}
+
 // Peercoin additional context free transaction checks.
 // Basing on CTransaction::CheckTransaction().
 // https://github.com/ppcoin/ppcoin/blob/v0.4.0ppc/src/main.cpp#L445
@@ -488,15 +497,6 @@ func ppcCheckTransactionSanity(tx *btcutil.Tx) error {
 		}
 	}
 	return nil
-}
-
-// GetMinFee calculates minimum required required for transaction.
-// https://github.com/ppcoin/ppcoin/blob/v0.4.0ppc/src/main.h#L592
-func GetMinFee(tx *btcutil.Tx) int64 {
-	baseFee := MinTxFee
-	bytes := tx.MsgTx().SerializeSize()
-	minFee := (1 + int64(bytes)/1000) * baseFee
-	return minFee
 }
 
 // Peercoin additional transaction checks.
@@ -555,7 +555,7 @@ func ppcCheckTransactionInput(tx *btcutil.Tx, txOut *btcwire.TxIn, originTx *TxD
 // Peercoin additional context free block checks.
 // Basing on CBlock::CheckBlock().
 // https://github.com/ppcoin/ppcoin/blob/v0.4.0ppc/src/main.cpp#L1829
-func ppcCheckBlockSanity(block *btcutil.Block) error {
+func ppcCheckBlockSanity(params *btcnet.Params, block *btcutil.Block) error {
 	msgBlock := block.MsgBlock()
 	// https://github.com/ppcoin/ppcoin/blob/v0.4.0ppc/src/main.cpp#L1853
 	// ppcoin: only the second transaction can be the optional coinstake
@@ -567,6 +567,24 @@ func ppcCheckBlockSanity(block *btcutil.Block) error {
 			str := "coinstake in wrong position"
 			return ruleError(ErrWrongCoinstakePosition, str)
 		}
+	}
+	// https://github.com/ppcoin/ppcoin/blob/v0.4.0ppc/src/main.cpp#L1858
+	// ppcoin: coinbase output should be empty if proof-of-stake block
+	// if (IsProofOfStake() && (vtx[0].vout.size() != 1 || !vtx[0].vout[0].IsEmpty()))
+	// 	return error("CheckBlock() : coinbase output not empty for proof-of-stake block");
+	if block.IsProofOfStake() && (len(msgBlock.Transactions[0].TxOut) != 1 || !msgBlock.Transactions[0].TxOut[0].IsEmpty()) {
+		str := "coinbase output not empty for proof-of-stake block"
+		return ruleError(ErrCoinbaseNotEmpty, str)
+	}
+	// https://github.com/ppcoin/ppcoin/blob/v0.4.0ppc/src/main.cpp#L1866
+	// Check coinstake timestamp
+	// if (IsProofOfStake() && !CheckCoinStakeTimestamp(GetBlockTime(), (int64)vtx[1].nTime))
+	// 	return DoS(50, error("CheckBlock() : coinstake timestamp violation nTimeBlock=%u nTimeTx=%u", GetBlockTime(), vtx[1].nTime));
+	if msgBlock.IsProofOfStake() && !CheckCoinStakeTimestamp(params, msgBlock.Header.Timestamp.Unix(),
+		msgBlock.Transactions[1].Time.Unix()) {
+		str := fmt.Sprintf("coinstake timestamp violation TimeBlock=%u TimeTx=%u",
+			msgBlock.Header.Timestamp, msgBlock.Transactions[1].Time)
+		return ruleError(ErrCoinstakeTimeViolation, str)
 	}
 	return nil
 }

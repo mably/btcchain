@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/mably/btcutil"
+	"github.com/mably/btcnet"
 )
 
 const (
@@ -141,6 +142,17 @@ func getStakeModifierCSHexString(stakeModifierCS uint32) string {
 func isProtocolV03(b *BlockChain, nTime int64) bool {
 	var switchTime int64
 	if b.netParams.Name == "testnet3" {
+		switchTime = nProtocolV03TestSwitchTime
+	} else {
+		switchTime = nProtocolV03SwitchTime
+	}
+	return nTime >= switchTime
+}
+
+// isProtocolV03FromParams
+func isProtocolV03FromParams(params *btcnet.Params, nTime int64) bool {
+	var switchTime int64
+	if params.Name == "testnet3" {
 		switchTime = nProtocolV03TestSwitchTime
 	} else {
 		switchTime = nProtocolV03SwitchTime

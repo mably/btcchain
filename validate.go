@@ -421,7 +421,7 @@ func CountP2SHSigOps(tx *btcutil.Tx, isCoinBaseTx bool, txStore TxStore) (int, e
 //
 // The flags do not modify the behavior of this function directly, however they
 // are needed to pass along to checkProofOfWork.
-func checkBlockSanity(block *btcutil.Block, powLimit *big.Int, flags BehaviorFlags) error {
+func checkBlockSanity(params *btcnet.Params, block *btcutil.Block, powLimit *big.Int, flags BehaviorFlags) error {
 
 	defer timeTrack(now(), fmt.Sprintf("checkBlockSanity(%v)", slice(block.Sha())[0]))
 
@@ -552,7 +552,7 @@ func checkBlockSanity(block *btcutil.Block, powLimit *big.Int, flags BehaviorFla
 	}
 
 	// Peercoin checks
-	ppcErr := ppcCheckBlockSanity(block)
+	ppcErr := ppcCheckBlockSanity(params, block)
 	if ppcErr != nil {
 		return ppcErr
 	}
@@ -562,8 +562,8 @@ func checkBlockSanity(block *btcutil.Block, powLimit *big.Int, flags BehaviorFla
 
 // CheckBlockSanity performs some preliminary checks on a block to ensure it is
 // sane before continuing with block processing.  These checks are context free.
-func CheckBlockSanity(block *btcutil.Block, powLimit *big.Int) error {
-	return checkBlockSanity(block, powLimit, BFNone)
+func CheckBlockSanity(params *btcnet.Params, block *btcutil.Block, powLimit *big.Int) error {
+	return checkBlockSanity(params, block, powLimit, BFNone)
 }
 
 // checkSerializedHeight checks if the signature script in the passed

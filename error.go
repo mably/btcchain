@@ -204,6 +204,14 @@ const (
 	// ErrWrongCoinstakePosition indicates the coinstake transaction is on
 	// higher position in the block than second.
 	ErrWrongCoinstakePosition
+
+	// ErrCoinbaseNotEmpty indicates the coinbase transaction output in
+	// proof-of-stake block is not empty.
+	ErrCoinbaseNotEmpty
+
+	// ErrCoinstakeTimeViolation indicates the coinstake timestamp doesn't
+	// meet protocol.
+	ErrCoinstakeTimeViolation
 )
 
 // Map of ErrorCode values back to their constant names for pretty printing.
@@ -254,6 +262,8 @@ var errorCodeStrings = map[ErrorCode]string{
 	ErrBadCoinstakeValue:      "ErrBadCoinstakeValue",
 	ErrInsufficientFee:        "ErrInsufficientFee",
 	ErrWrongCoinstakePosition: "ErrWrongCoinstakePosition",
+	ErrCoinbaseNotEmpty:       "ErrCoinbaseNotEmpty",
+	ErrCoinstakeTimeViolation: "ErrCoinstakeTimeViolation",
 }
 
 // String returns the ErrorCode as a human-readable name.

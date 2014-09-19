@@ -44,7 +44,7 @@ func TestCheckConnectBlock(t *testing.T) {
 func TestCheckBlockSanity(t *testing.T) {
 	powLimit := btcnet.MainNetParams.PowLimit
 	block := btcutil.NewBlock(&Block100000)
-	err := btcchain.CheckBlockSanity(block, powLimit)
+	err := btcchain.CheckBlockSanity(&btcnet.MainNetParams, block, powLimit)
 	if err != nil {
 		t.Errorf("CheckBlockSanity: %v", err)
 	}
@@ -53,7 +53,7 @@ func TestCheckBlockSanity(t *testing.T) {
 	// second fails.
 	timestamp := block.MsgBlock().Header.Timestamp
 	block.MsgBlock().Header.Timestamp = timestamp.Add(time.Nanosecond)
-	err = btcchain.CheckBlockSanity(block, powLimit)
+	err = btcchain.CheckBlockSanity(&btcnet.MainNetParams, block, powLimit)
 	if err == nil {
 		t.Errorf("CheckBlockSanity: error is nil when it shouldn't be")
 	}
