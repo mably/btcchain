@@ -521,13 +521,20 @@ func ppcCheckTransactionInputs(tx *btcutil.Tx, txStore TxStore, blockChain *Bloc
 			return fmt.Errorf("unable to get coin age for coinstake: %v", err)
 		}
 		stakeReward := satoshiOut - satoshiIn
-		log.Infof("coinAge %v", coinAge)
-		log.Infof("minFee %v", GetMinFee(tx))
-		log.Infof("proofOfStakeReward %v", GetProofOfStakeReward(int64(coinAge)))
 		maxReward := GetProofOfStakeReward(int64(coinAge)) - GetMinFee(tx) + MinTxFee
 		if stakeReward > maxReward {
 			str := fmt.Sprintf("%v stake reward value %v exceeded %v", tx.Sha(), stakeReward, maxReward)
 			return ruleError(ErrBadCoinstakeValue, str)
+		}
+	} else {
+		// https://github.com/ppcoin/ppcoin/blob/v0.4.0ppc/src/main.cpp#L1249
+		// ppcoin: enforce transaction fees for every block
+		// if (nTxFee < GetMinFee())
+		// 	return fBlock? DoS(100, error("ConnectInputs() : %s not paying required fee=%s, paid=%s", GetHash().ToString().substr(0,10).c_str(), FormatMoney(GetMinFee()).c_str(), FormatMoney(nTxFee).c_str())) : false;
+		txFee := satoshiIn - satoshiOut
+		if txFee < GetMinFee(tx) {
+			str := fmt.Sprintf("%v not paying required fee=%s, paid=%s", tx.Sha(), GetMinFee(tx), txFee)
+			return ruleError(ErrInsufficientFee, str)
 		}
 	}
 	return nil

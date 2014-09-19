@@ -196,6 +196,10 @@ const (
 	// ErrBadCoinstakeValue indicates the amount of a coinstake value does
 	// not match the expected value of the subsidy.
 	ErrBadCoinstakeValue
+
+	// ErrInsufficientFee indicates the fee paid by transaction is lower than
+	// minimum required for it.
+	ErrInsufficientFee
 )
 
 // Map of ErrorCode values back to their constant names for pretty printing.
@@ -244,6 +248,7 @@ var errorCodeStrings = map[ErrorCode]string{
 	ErrEmptyTxOut:        "ErrEmptyTxOut",
 	ErrEarlierTimestamp:  "ErrEarlierTimestamp",
 	ErrBadCoinstakeValue: "ErrBadCoinstakeValue",
+	ErrInsufficientFee:   "ErrInsufficientFee",
 }
 
 // String returns the ErrorCode as a human-readable name.
