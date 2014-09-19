@@ -551,6 +551,12 @@ func checkBlockSanity(block *btcutil.Block, powLimit *big.Int, flags BehaviorFla
 		}
 	}
 
+	// Peercoin checks
+	ppcErr := ppcCheckBlockSanity(block)
+	if ppcErr != nil {
+		return ppcErr
+	}
+
 	return nil
 }
 

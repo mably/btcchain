@@ -200,6 +200,10 @@ const (
 	// ErrInsufficientFee indicates the fee paid by transaction is lower than
 	// minimum required for it.
 	ErrInsufficientFee
+
+	// ErrWrongCoinstakePosition indicates the coinstake transaction is on
+	// higher position in the block than second.
+	ErrWrongCoinstakePosition
 )
 
 // Map of ErrorCode values back to their constant names for pretty printing.
@@ -244,11 +248,12 @@ var errorCodeStrings = map[ErrorCode]string{
 	ErrScriptValidation:      "ErrScriptValidation",
 
 	// Peercoin
-	ErrProofOfStakeCheck: "ErrProofOfStakeCheck",
-	ErrEmptyTxOut:        "ErrEmptyTxOut",
-	ErrEarlierTimestamp:  "ErrEarlierTimestamp",
-	ErrBadCoinstakeValue: "ErrBadCoinstakeValue",
-	ErrInsufficientFee:   "ErrInsufficientFee",
+	ErrProofOfStakeCheck:      "ErrProofOfStakeCheck",
+	ErrEmptyTxOut:             "ErrEmptyTxOut",
+	ErrEarlierTimestamp:       "ErrEarlierTimestamp",
+	ErrBadCoinstakeValue:      "ErrBadCoinstakeValue",
+	ErrInsufficientFee:        "ErrInsufficientFee",
+	ErrWrongCoinstakePosition: "ErrWrongCoinstakePosition",
 }
 
 // String returns the ErrorCode as a human-readable name.

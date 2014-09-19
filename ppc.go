@@ -551,3 +551,22 @@ func ppcCheckTransactionInput(tx *btcutil.Tx, txOut *btcwire.TxIn, originTx *TxD
 	}
 	return nil
 }
+
+// Peercoin additional context free block checks.
+// Basing on CBlock::CheckBlock().
+// https://github.com/ppcoin/ppcoin/blob/v0.4.0ppc/src/main.cpp#L1829
+func ppcCheckBlockSanity(block *btcutil.Block) error {
+	msgBlock := block.MsgBlock()
+	// https://github.com/ppcoin/ppcoin/blob/v0.4.0ppc/src/main.cpp#L1853
+	// ppcoin: only the second transaction can be the optional coinstake
+	// for (int i = 2; i < vtx.size(); i++)
+	// 	if (vtx[i].IsCoinStake())
+	// 		return DoS(100, error("CheckBlock() : coinstake in wrong position"));
+	for i := 2; i < len(msgBlock.Transactions); i++ {
+		if msgBlock.Transactions[i].IsCoinStake() {
+			str := "coinstake in wrong position"
+			return ruleError(ErrWrongCoinstakePosition, str)
+		}
+	}
+	return nil
+}
