@@ -696,8 +696,7 @@ func (b *BlockChain) checkBlockProofOfStake(block *btcutil.Block) error {
 		hashProofOfStake, err :=
 			b.checkTxProofOfStake(tx, block.MsgBlock().Header.Bits)
 		if err != nil {
-			str := fmt.Sprintf("Proof of stake check failed for block %v : %v", blockHash, err)
-			return ruleError(ErrProofOfStakeCheck, str)
+			return err
 		} else {
 			SetProofOfStake(block.Meta(), true) // Important: flags
 			block.Meta().HashProofOfStake = *hashProofOfStake
