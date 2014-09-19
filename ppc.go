@@ -25,6 +25,11 @@ const (
 	MaxMoney           int64 = 2000000000 * Coin
 	MaxMintProofOfWork int64 = 9999 * Coin
 	MinTxOutAmount     int64 = MinTxFee
+
+	MAX_BLOCK_SIZE          uint   = 1000000
+	MAX_BLOCK_SIZE_GEN      uint   = MAX_BLOCK_SIZE/2
+    MAX_BLOCK_SIGOPS        uint   = MAX_BLOCK_SIZE/50
+    MAX_ORPHAN_TRANSACTIONS uint   = MAX_BLOCK_SIZE/100
 )
 
 var ZeroSha = btcwire.ShaHash{}
@@ -278,11 +283,11 @@ func (b *BlockChain) GetCoinAgeTx(tx *btcutil.Tx, txStore TxStore) (uint64, erro
         nValueIn := txPrev.Tx.MsgTx().TxOut[txPrevIndex].Value
         bnCentSecond = new(big.Int).Add(bnCentSecond, new(big.Int).Mul(big.NewInt(nValueIn), big.NewInt((nTime-txPrevTime) / Cent)))
 
-        log.Debugf("coin age nValueIn=%v nTimeDiff=%v bnCentSecond=%v\n", nValueIn, nTime - txPrevTime, bnCentSecond)
+        log.Debugf("coin age nValueIn=%v nTimeDiff=%v bnCentSecond=%v", nValueIn, nTime - txPrevTime, bnCentSecond)
     }
 
     bnCoinDay := new(big.Int).Mul(bnCentSecond, big.NewInt(Cent / Coin / (24 * 60 * 60)))
-    log.Debugf("coin age bnCoinDay=%v\n", bnCoinDay)
+    log.Debugf("coin age bnCoinDay=%v", bnCoinDay)
 
     return bnCoinDay.Uint64(), nil
 }
@@ -313,6 +318,64 @@ func (b *BlockChain) GetCoinAgeBlock(node *blockNode, block *btcutil.Block) (uin
     log.Debugf("block coin age total nCoinDays=%v", nCoinAge);
 
     return nCoinAge, nil
+}
+
+func GetMinFee(tx *btcutil.Tx, nBlockSize uint/* = 1*/, fAllowFree bool/* = false*/, relay bool/* = false*/) int64 {
+
+	// Base fee is either MinTxFee or MinRelayTxFee
+	var nBaseFee int64
+	if relay {
+		nBaseFee = MinRelayTxFee
+	} else {
+		nBaseFee = MinTxFee
+	}
+
+	nBytes := uint(tx.MsgTx().SerializeSize())
+	nNewBlockSize := nBlockSize + nBytes
+	nMinFee := (1 + int64(nBytes) / 1000) * nBaseFee
+
+	if fAllowFree {
+		if nBlockSize == 1 {
+			// Transactions under 10K are free
+			// (about 4500bc if made of 50bc inputs)
+			if nBytes < 10000 {
+				nMinFee = 0
+			}
+		} else {
+			// Free transaction area
+			if nNewBlockSize < 27000 {
+				nMinFee = 0
+			}
+		}
+	}
+
+	// To limit dust spam, require MinTxFee/MinRelayTxFee if any output is less than 0.01
+	if nMinFee < nBaseFee {
+		for _, txOut := range tx.MsgTx().TxOut {
+			if txOut.Value < Cent {
+				nMinFee = nBaseFee
+			}
+		}
+	}
+
+	// Raise the price as the block approaches full
+	if nBlockSize != 1 && nNewBlockSize >= MAX_BLOCK_SIZE_GEN/2 {
+		if nNewBlockSize >= MAX_BLOCK_SIZE_GEN {
+			return MaxMoney
+		}
+		nMinFee *= int64(MAX_BLOCK_SIZE_GEN / (MAX_BLOCK_SIZE_GEN - nNewBlockSize))
+	}
+
+	if !MoneyRange(nMinFee) {
+		nMinFee = MaxMoney
+	}
+
+	return nMinFee
+}
+
+// MoneyRange
+func MoneyRange(nValue int64) bool {
+	return nValue >= 0 && nValue <= MaxMoney
 }
 
 // ppcoin: miner's coin stake is rewarded based on coin age spent (coin-days)
