@@ -179,9 +179,23 @@ const (
 	// the stack.
 	ErrScriptValidation
 
+	// Peercoin errors
+
 	// ErrProofOfStakeCheck indicates the result of executing peercoin
 	// proof of stake failed.
 	ErrProofOfStakeCheck
+
+	// ErrEmptyTxOut indicates the user transaction (not coinbase nor coinstake)
+	// output was empty.
+	ErrEmptyTxOut
+
+	// ErrEarlierTimestamp indicates the transaction timestamp is earlier
+	// than timestamp of imput transaction.
+	ErrEarlierTimestamp
+
+	// ErrBadCoinstakeValue indicates the amount of a coinstake value does
+	// not match the expected value of the subsidy.
+	ErrBadCoinstakeValue
 )
 
 // Map of ErrorCode values back to their constant names for pretty printing.
@@ -224,7 +238,12 @@ var errorCodeStrings = map[ErrorCode]string{
 	ErrBadCoinbaseHeight:     "ErrBadCoinbaseHeight",
 	ErrScriptMalformed:       "ErrScriptMalformed",
 	ErrScriptValidation:      "ErrScriptValidation",
-	ErrProofOfStakeCheck:     "ErrProofOfStakeCheck",
+
+	// Peercoin
+	ErrProofOfStakeCheck: "ErrProofOfStakeCheck",
+	ErrEmptyTxOut:        "ErrEmptyTxOut",
+	ErrEarlierTimestamp:  "ErrEarlierTimestamp",
+	ErrBadCoinstakeValue: "ErrBadCoinstakeValue",
 }
 
 // String returns the ErrorCode as a human-readable name.

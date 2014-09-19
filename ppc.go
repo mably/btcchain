@@ -171,11 +171,11 @@ func CalcTrust(bits uint32, proofOfStake bool) *big.Int {
 
 func (b *BlockChain) CalcMintAndMoneySupply(node *blockNode, block *btcutil.Block) error {
 
-    var nFees int64 = 0
-    var nValueIn int64 = 0
-    var nValueOut int64 = 0
+	var nFees int64 = 0
+	var nValueIn int64 = 0
+	var nValueOut int64 = 0
 
-    txStore, err := b.fetchInputTransactions(node, block)
+	txStore, err := b.fetchInputTransactions(node, block)
 	if err != nil {
 		return err
 	}
@@ -188,9 +188,9 @@ func (b *BlockChain) CalcMintAndMoneySupply(node *blockNode, block *btcutil.Bloc
 			nTxValueOut += txOut.Value
 		}
 
-        if IsCoinBase(tx) {
-            nValueOut += nTxValueOut
-        } else {
+		if IsCoinBase(tx) {
+			nValueOut += nTxValueOut
+		} else {
 			var nTxValueIn int64 = 0
 			for _, txIn := range tx.MsgTx().TxIn {
 				txInHash := &txIn.PreviousOutpoint.Hash
@@ -199,32 +199,32 @@ func (b *BlockChain) CalcMintAndMoneySupply(node *blockNode, block *btcutil.Bloc
 				originTxSatoshi := originTx.Tx.MsgTx().TxOut[originTxIndex].Value
 				nTxValueIn += originTxSatoshi
 			}
-            nValueIn += nTxValueIn
-            nValueOut += nTxValueOut
-            if !IsCoinStake(tx) {
-                nFees += nTxValueIn - nTxValueOut
+			nValueIn += nTxValueIn
+			nValueOut += nTxValueOut
+			if !IsCoinStake(tx) {
+				nFees += nTxValueIn - nTxValueOut
 			}
-        }
-    }
+		}
+	}
 
 	log.Debugf("height = %v, nValueIn = %v, nValueOut = %v, nFees = %v", block.Height(), nValueIn, nValueOut, nFees)
 
-    // ppcoin: track money supply and mint amount info
-    block.Meta().Mint = nValueOut - nValueIn + nFees
+	// ppcoin: track money supply and mint amount info
+	block.Meta().Mint = nValueOut - nValueIn + nFees
 	var prevNode *blockNode
-    prevNode, err = b.getPrevNodeFromNode(node)
-    if err != nil {
+	prevNode, err = b.getPrevNodeFromNode(node)
+	if err != nil {
 		return err
 	}
-    if prevNode == nil {
-    	block.Meta().MoneySupply = nValueOut - nValueIn
-    } else {
-    	block.Meta().MoneySupply = prevNode.meta.MoneySupply + nValueOut - nValueIn
-    }
+	if prevNode == nil {
+		block.Meta().MoneySupply = nValueOut - nValueIn
+	} else {
+		block.Meta().MoneySupply = prevNode.meta.MoneySupply + nValueOut - nValueIn
+	}
 
 	log.Debugf("height = %v, mint = %v, moneySupply = %v", block.Height(), block.Meta().Mint, block.Meta().MoneySupply)
 
-    return nil
+	return nil
 }
 
 // ppcoin: total coin age spent in transaction, in the unit of coin-days.
@@ -236,26 +236,26 @@ func (b *BlockChain) CalcMintAndMoneySupply(node *blockNode, block *btcutil.Bloc
 // age (trust score) of competing branches.
 func (b *BlockChain) GetCoinAgeTx(tx *btcutil.Tx, txStore TxStore) (uint64, error) {
 
-    var bnCentSecond *big.Int = big.NewInt(0)  // coin age in the unit of cent-seconds
+	var bnCentSecond *big.Int = big.NewInt(0) // coin age in the unit of cent-seconds
 
-    if IsCoinBase(tx) {
-        return 0, nil
+	if IsCoinBase(tx) {
+		return 0, nil
 	}
 
 	var nTime int64 = tx.MsgTx().Time.Unix()
 
 	for _, txIn := range tx.MsgTx().TxIn {
-        // First try finding the previous transaction in database
+		// First try finding the previous transaction in database
 		txInHash := &txIn.PreviousOutpoint.Hash
 		txPrev, ok := txStore[*txInHash]
-        if !ok {
-            continue  // previous transaction not in main chain
-        }
-        txPrevTime := txPrev.Tx.MsgTx().Time.Unix()
-        if nTime < txPrevTime {
-        	err := fmt.Errorf("Transaction timestamp violation")
-            return 0, err  // Transaction timestamp violation
-        }
+		if !ok || txPrev.Tx == nil {
+			continue // previous transaction not in main chain
+		}
+		txPrevTime := txPrev.Tx.MsgTx().Time.Unix()
+		if nTime < txPrevTime {
+			err := fmt.Errorf("Transaction timestamp violation")
+			return 0, err // Transaction timestamp violation
+		}
 
 		// Read block header
 		// The desired block height is in the main chain, so look it up
@@ -270,57 +270,60 @@ func (b *BlockChain) GetCoinAgeTx(tx *btcutil.Tx, txStore TxStore) (uint64, erro
 			err = fmt.Errorf("CheckProofOfStake() : read block failed") // unable to read block of previous transaction
 			return 0, err
 		}
-        if txPrevBlock.MsgBlock().Header.Timestamp.Unix() + b.netParams.StakeMinAge > nTime {
-            continue // only count coins meeting min age requirement
-        }
+		if txPrevBlock.MsgBlock().Header.Timestamp.Unix()+b.netParams.StakeMinAge > nTime {
+			continue // only count coins meeting min age requirement
+		}
 
 		txPrevIndex := txIn.PreviousOutpoint.Index
-        nValueIn := txPrev.Tx.MsgTx().TxOut[txPrevIndex].Value
-        bnCentSecond = new(big.Int).Add(bnCentSecond, new(big.Int).Mul(big.NewInt(nValueIn), big.NewInt((nTime-txPrevTime) / Cent)))
+		nValueIn := txPrev.Tx.MsgTx().TxOut[txPrevIndex].Value
+		bnCentSecond.Add(bnCentSecond,
+			new(big.Int).Div(new(big.Int).Mul(big.NewInt(nValueIn), big.NewInt((nTime-txPrevTime))),
+				big.NewInt(Cent)))
 
-        log.Debugf("coin age nValueIn=%v nTimeDiff=%v bnCentSecond=%v\n", nValueIn, nTime - txPrevTime, bnCentSecond)
-    }
+		log.Debugf("coin age nValueIn=%v nTimeDiff=%v bnCentSecond=%v\n", nValueIn, nTime-txPrevTime, bnCentSecond)
+	}
 
-    bnCoinDay := new(big.Int).Mul(bnCentSecond, big.NewInt(Cent / Coin / (24 * 60 * 60)))
-    log.Debugf("coin age bnCoinDay=%v\n", bnCoinDay)
+	bnCoinDay := new(big.Int).Div(new(big.Int).Mul(bnCentSecond, big.NewInt(Cent)),
+		big.NewInt(int64(Coin)*24*60*60))
+	log.Debugf("coin age bnCoinDay=%v\n", bnCoinDay)
 
-    return bnCoinDay.Uint64(), nil
+	return bnCoinDay.Uint64(), nil
 }
 
 // ppcoin: total coin age spent in block, in the unit of coin-days.
 func (b *BlockChain) GetCoinAgeBlock(node *blockNode, block *btcutil.Block) (uint64, error) {
 
-    txStore, err := b.fetchInputTransactions(node, block)
+	txStore, err := b.fetchInputTransactions(node, block)
 	if err != nil {
 		return 0, err
 	}
 
-    var nCoinAge uint64 = 0
+	var nCoinAge uint64 = 0
 
 	transactions := block.Transactions()
 	for _, tx := range transactions {
-        nTxCoinAge, err := b.GetCoinAgeTx(tx, txStore)
-        if err != nil {
-        	return 0, err
-        }
-        nCoinAge += nTxCoinAge
-    }
+		nTxCoinAge, err := b.GetCoinAgeTx(tx, txStore)
+		if err != nil {
+			return 0, err
+		}
+		nCoinAge += nTxCoinAge
+	}
 
-    if nCoinAge == 0 { // block coin age minimum 1 coin-day
-        nCoinAge = 1
-    }
+	if nCoinAge == 0 { // block coin age minimum 1 coin-day
+		nCoinAge = 1
+	}
 
-    log.Debugf("block coin age total nCoinDays=%v", nCoinAge);
+	log.Debugf("block coin age total nCoinDays=%v", nCoinAge)
 
-    return nCoinAge, nil
+	return nCoinAge, nil
 }
 
 // ppcoin: miner's coin stake is rewarded based on coin age spent (coin-days)
-func  GetProofOfStakeReward(nCoinAge int64) (int64, error) {
-    nRewardCoinYear := Cent  // creation amount per coin-year
-    nSubsidy := nCoinAge * 33 / (365 * 33 + 8) * nRewardCoinYear
-    log.Debugf("GetProofOfStakeReward(): create=%s nCoinAge=%v", nSubsidy, nCoinAge);
-    return nSubsidy, nil
+func GetProofOfStakeReward(nCoinAge int64) int64 {
+	nRewardCoinYear := Cent // creation amount per coin-year
+	nSubsidy := nCoinAge * 33 / (365*33 + 8) * nRewardCoinYear
+	log.Debugf("GetProofOfStakeReward(): create=%s nCoinAge=%v", nSubsidy, nCoinAge)
+	return nSubsidy
 }
 
 // IsCoinStake determines whether or not a transaction is a coinstake.  A coinstake
@@ -422,6 +425,8 @@ func BigToShaHash(value *big.Int) (*btcwire.ShaHash, error) {
 	return btcwire.NewShaHash(pbuf)
 }
 
+// PPCGetProofOfWorkReward is Peercoin's validate.go:CalcBlockSubsidy(...)
+// counterpart.
 // https://github.com/ppcoin/ppcoin/blob/v0.4.0ppc/src/main.cpp#L829
 func PPCGetProofOfWorkReward(nBits uint32, netParams *btcnet.Params) (subsidy int64) {
 	bigTwo := new(big.Int).SetInt64(2)
@@ -456,4 +461,86 @@ func PPCGetProofOfWorkReward(nBits uint32, netParams *btcnet.Params) (subsidy in
 		subsidy = MaxMintProofOfWork
 	}
 	return
+}
+
+// Peercoin additional context free transaction checks.
+// Basing on CTransaction::CheckTransaction().
+// https://github.com/ppcoin/ppcoin/blob/v0.4.0ppc/src/main.cpp#L445
+func ppcCheckTransactionSanity(tx *btcutil.Tx) error {
+	msgTx := tx.MsgTx()
+	for _, txOut := range msgTx.TxOut {
+		// https://github.com/ppcoin/ppcoin/blob/v0.4.0ppc/src/main.cpp#L461
+		// if (txout.IsEmpty() && (!IsCoinBase()) && (!IsCoinStake()))
+		// 	return DoS(100, error("CTransaction::CheckTransaction() : txout empty for user transaction"));
+		if txOut.IsEmpty() && (!IsCoinBase(tx)) && (!IsCoinStake(tx)) {
+			str := "transaction output empty for user transaction"
+			return ruleError(ErrEmptyTxOut, str)
+		}
+
+		// https://github.com/ppcoin/ppcoin/blob/v0.4.0ppc/src/main.cpp#L463
+		// ppcoin: enforce minimum output amount
+		// if ((!txout.IsEmpty()) && txout.nValue < MIN_TXOUT_AMOUNT)
+		// 	return DoS(100, error("CTransaction::CheckTransaction() : txout.nValue below minimum"));
+		if (!txOut.IsEmpty()) && txOut.Value < MinTxOutAmount {
+			str := fmt.Sprintf("transaction output value of %v is below minimum %v",
+				txOut.Value, MinTxOutAmount)
+			return ruleError(ErrBadTxOutValue, str)
+		}
+	}
+	return nil
+}
+
+// GetMinFee calculates minimum required required for transaction.
+// https://github.com/ppcoin/ppcoin/blob/v0.4.0ppc/src/main.h#L592
+func GetMinFee(tx *btcutil.Tx) int64 {
+	baseFee := MinTxFee
+	bytes := tx.MsgTx().SerializeSize()
+	minFee := (1 + int64(bytes)/1000) * baseFee
+	return minFee
+}
+
+// Peercoin additional transaction checks.
+// Basing on CTransaction::ConnectInputs().
+// https://github.com/ppcoin/ppcoin/blob/v0.4.0ppc/src/main.cpp#L1149
+func ppcCheckTransactionInputs(tx *btcutil.Tx, txStore TxStore, blockChain *BlockChain,
+	satoshiIn int64, satoshiOut int64) error {
+	// https://github.com/ppcoin/ppcoin/blob/v0.4.0ppc/src/main.cpp#L1230
+	// ppcoin: coin stake tx earns reward instead of paying fee
+	// if (IsCoinStake())
+	// {
+	// uint64 nCoinAge;
+	// if (!GetCoinAge(txdb, nCoinAge))
+	// 	return error("ConnectInputs() : %s unable to get coin age for coinstake", GetHash().ToString().substr(0,10).c_str());
+	// int64 nStakeReward = GetValueOut() - nValueIn;
+	// if (nStakeReward > GetProofOfStakeReward(nCoinAge) - GetMinFee() + MIN_TX_FEE)
+	// 	return DoS(100, error("ConnectInputs() : %s stake reward exceeded", GetHash().ToString().substr(0,10).c_str()));
+	// }
+	if IsCoinStake(tx) {
+		coinAge, err := blockChain.GetCoinAgeTx(tx, txStore)
+		if err != nil {
+			return fmt.Errorf("unable to get coin age for coinstake: %v", err)
+		}
+		stakeReward := satoshiOut - satoshiIn
+		log.Infof("coinAge %v", coinAge)
+		log.Infof("minFee %v", GetMinFee(tx))
+		log.Infof("proofOfStakeReward %v", GetProofOfStakeReward(int64(coinAge)))
+		maxReward := GetProofOfStakeReward(int64(coinAge)) - GetMinFee(tx) + MinTxFee
+		if stakeReward > maxReward {
+			str := fmt.Sprintf("%v stake reward value %v exceeded %v", tx.Sha(), stakeReward, maxReward)
+			return ruleError(ErrBadCoinstakeValue, str)
+		}
+	}
+	return nil
+}
+
+func ppcCheckTransactionInput(tx *btcutil.Tx, txOut *btcwire.TxIn, originTx *TxData) error {
+	// https://github.com/ppcoin/ppcoin/blob/v0.4.0ppc/src/main.cpp#L1177
+	// ppcoin: check transaction timestamp
+	// if (txPrev.nTime > nTime)
+	// 	return DoS(100, error("ConnectInputs() : transaction timestamp earlier than input transaction"));
+	if originTx.Tx.MsgTx().Time.After(tx.MsgTx().Time) {
+		str := "transaction timestamp earlier than input transaction"
+		return ruleError(ErrEarlierTimestamp, str)
+	}
+	return nil
 }
