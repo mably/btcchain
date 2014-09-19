@@ -239,13 +239,18 @@ func (b *BlockChain) CalcMintAndMoneySupply(node *blockNode, block *btcutil.Bloc
 // guaranteed to be in main chain by sync-checkpoint. This rule is
 // introduced to help nodes establish a consistent view of the coin
 // age (trust score) of competing branches.
-func (b *BlockChain) GetCoinAgeTx(tx *btcutil.Tx, txStore TxStore) (uint64, error) {
-
-    var bnCentSecond *big.Int = big.NewInt(0)  // coin age in the unit of cent-seconds
+func (b *BlockChain) GetCoinAgeTx(tx *btcutil.Tx) (uint64, error) {
 
     if IsCoinBase(tx) {
         return 0, nil
 	}
+
+    txStore, err := b.FetchTransactionStore(tx)
+	if err != nil {
+		return 0, err
+	}
+
+    var bnCentSecond *big.Int = big.NewInt(0)  // coin age in the unit of cent-seconds
 
 	var nTime int64 = tx.MsgTx().Time.Unix()
 
@@ -293,18 +298,13 @@ func (b *BlockChain) GetCoinAgeTx(tx *btcutil.Tx, txStore TxStore) (uint64, erro
 }
 
 // ppcoin: total coin age spent in block, in the unit of coin-days.
-func (b *BlockChain) GetCoinAgeBlock(node *blockNode, block *btcutil.Block) (uint64, error) {
-
-    txStore, err := b.fetchInputTransactions(node, block)
-	if err != nil {
-		return 0, err
-	}
+func (b *BlockChain) GetCoinAgeBlock(block *btcutil.Block) (uint64, error) {
 
     var nCoinAge uint64 = 0
 
 	transactions := block.Transactions()
 	for _, tx := range transactions {
-        nTxCoinAge, err := b.GetCoinAgeTx(tx, txStore)
+        nTxCoinAge, err := b.GetCoinAgeTx(tx)
         if err != nil {
         	return 0, err
         }
