@@ -212,6 +212,13 @@ const (
 	// ErrCoinstakeTimeViolation indicates the coinstake timestamp doesn't
 	// meet protocol.
 	ErrCoinstakeTimeViolation
+
+	// ErrBlockBeforeTx indicates the block timestamp is before timestamp
+	// of one of its transactions.
+	ErrBlockBeforeTx
+
+	// ErrBadBlockSignature indicates the block signature is invalid.
+	ErrBadBlockSignature
 )
 
 // Map of ErrorCode values back to their constant names for pretty printing.
@@ -264,6 +271,8 @@ var errorCodeStrings = map[ErrorCode]string{
 	ErrWrongCoinstakePosition: "ErrWrongCoinstakePosition",
 	ErrCoinbaseNotEmpty:       "ErrCoinbaseNotEmpty",
 	ErrCoinstakeTimeViolation: "ErrCoinstakeTimeViolation",
+	ErrBlockBeforeTx:          "ErrBlockBeforeTx",
+	ErrBadBlockSignature:      "ErrBadBlockSignature",
 }
 
 // String returns the ErrorCode as a human-readable name.

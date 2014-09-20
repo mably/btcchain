@@ -6,7 +6,9 @@ package btcchain
 
 import (
 	"fmt"
+	"github.com/conformal/btcec"
 	"github.com/mably/btcnet"
+	"github.com/mably/btcscript"
 	"github.com/mably/btcutil"
 	"github.com/mably/btcwire"
 	"math/big"
@@ -472,6 +474,41 @@ func GetMinFee(tx *btcutil.Tx) int64 {
 	return minFee
 }
 
+// ppcoin: check block signature
+// https://github.com/ppcoin/ppcoin/blob/v0.4.0ppc/src/main.cpp#L2116
+func CheckBlockSignature(msgBlock *btcwire.MsgBlock,
+	params *btcnet.Params) bool {
+	sha, err := msgBlock.BlockSha()
+	if err != nil {
+		return false
+	}
+	if sha.IsEqual(params.GenesisHash) {
+		return len(msgBlock.Signature) == 0
+	}
+	var txOut *btcwire.TxOut
+	if msgBlock.IsProofOfStake() {
+		txOut = msgBlock.Transactions[1].TxOut[1]
+	} else {
+		txOut = msgBlock.Transactions[0].TxOut[0]
+	}
+	scriptClass, addresses, _, err := btcscript.ExtractPkScriptAddrs(txOut.PkScript, params)
+	if err != nil {
+		return false
+	}
+	if scriptClass != btcscript.PubKeyTy {
+		return false
+	}
+	a, ok := addresses[0].(*btcutil.AddressPubKey)
+	if !ok {
+		return false
+	}
+	sig, err := btcec.ParseSignature(msgBlock.Signature, btcec.S256())
+	if err != nil {
+		return false
+	}
+	return sig.Verify(sha.Bytes(), a.PubKey())
+}
+
 // Peercoin additional context free transaction checks.
 // Basing on CTransaction::CheckTransaction().
 // https://github.com/ppcoin/ppcoin/blob/v0.4.0ppc/src/main.cpp#L445
@@ -585,6 +622,23 @@ func ppcCheckBlockSanity(params *btcnet.Params, block *btcutil.Block) error {
 		str := fmt.Sprintf("coinstake timestamp violation TimeBlock=%u TimeTx=%u",
 			msgBlock.Header.Timestamp, msgBlock.Transactions[1].Time)
 		return ruleError(ErrCoinstakeTimeViolation, str)
+	}
+	for _, tx := range msgBlock.Transactions {
+		// https://github.com/ppcoin/ppcoin/blob/v0.4.0ppc/src/main.cpp#L1881
+		// ppcoin: check transaction timestamp
+		// if (GetBlockTime() < (int64)tx.nTime)
+		//  return DoS(50, error("CheckBlock() : block timestamp earlier than transaction timestamp"));
+		if msgBlock.Header.Timestamp.Before(tx.Time) {
+			str := "block timestamp earlier than transaction timestamp"
+			return ruleError(ErrBlockBeforeTx, str)
+		}
+	}
+	// ppcoin: check block signature
+	// if (!CheckBlockSignature())
+	// 	return DoS(100, error("CheckBlock() : bad block signature"));
+	if !CheckBlockSignature(msgBlock, params) {
+		str := "bad block signature"
+		return ruleError(ErrBadBlockSignature, str)
 	}
 	return nil
 }
