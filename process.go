@@ -94,6 +94,9 @@ func (b *BlockChain) processOrphans(hash *btcwire.ShaHash, flags BehaviorFlags) 
 			b.removeOrphanBlock(orphan)
 			i--
 
+			// ppc: processing
+			b.ppcOrphanBlockRemoved(orphan.block)
+
 			// Potentially accept the block into the block chain.
 			err := b.maybeAcceptBlock(orphan.block, flags)
 			if err != nil {
@@ -146,8 +149,14 @@ func (b *BlockChain) ProcessBlock(block *btcutil.Block, flags BehaviorFlags) (bo
 		return false, ruleError(ErrDuplicateBlock, str)
 	}
 
+	// ppc: processing
+	ppcErr := b.ppcProcessBlock(block, phasePreSanity)
+	if ppcErr != nil {
+		return false, ppcErr
+	}
+
 	// Perform preliminary sanity checks on the block and its transactions.
-	err = checkBlockSanity(block, b.netParams.PowLimit, flags)
+	err = checkBlockSanity(b.netParams, block, b.netParams.PowLimit, flags)
 	if err != nil {
 		return false, err
 	}
@@ -210,6 +219,11 @@ func (b *BlockChain) ProcessBlock(block *btcutil.Block, flags BehaviorFlags) (bo
 		}
 		if !prevHashExists {
 			if !dryRun {
+				// ppc: processing
+				ppcErr := b.ppcProcessOrphan(block)
+				if ppcErr != nil {
+					return false, ppcErr
+				}
 				log.Infof("Adding orphan block %v with parent %v",
 					blockHash, prevHash)
 				b.addOrphanBlock(block)

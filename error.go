@@ -179,9 +179,51 @@ const (
 	// the stack.
 	ErrScriptValidation
 
+	// Peercoin errors
+
 	// ErrProofOfStakeCheck indicates the result of executing peercoin
 	// proof of stake failed.
 	ErrProofOfStakeCheck
+
+	// ErrEmptyTxOut indicates the user transaction (not coinbase nor coinstake)
+	// output was empty.
+	ErrEmptyTxOut
+
+	// ErrEarlierTimestamp indicates the transaction timestamp is earlier
+	// than timestamp of imput transaction.
+	ErrEarlierTimestamp
+
+	// ErrBadCoinstakeValue indicates the amount of a coinstake value does
+	// not match the expected value of the subsidy.
+	ErrBadCoinstakeValue
+
+	// ErrInsufficientFee indicates the fee paid by transaction is lower than
+	// minimum required for it.
+	ErrInsufficientFee
+
+	// ErrWrongCoinstakePosition indicates the coinstake transaction is on
+	// higher position in the block than second.
+	ErrWrongCoinstakePosition
+
+	// ErrCoinbaseNotEmpty indicates the coinbase transaction output in
+	// proof-of-stake block is not empty.
+	ErrCoinbaseNotEmpty
+
+	// ErrCoinstakeTimeViolation indicates the coinstake timestamp doesn't
+	// meet protocol.
+	ErrCoinstakeTimeViolation
+
+	// ErrBlockBeforeTx indicates the block timestamp is before timestamp
+	// of one of its transactions.
+	ErrBlockBeforeTx
+
+	// ErrBadBlockSignature indicates the block signature is invalid.
+	ErrBadBlockSignature
+
+	// ErrDuplicateStake indicates the stake used in proof-of-stake block
+	// was already used and block was rejected to prevent block-flood
+	// attack.
+	ErrDuplicateStake
 )
 
 // Map of ErrorCode values back to their constant names for pretty printing.
@@ -224,7 +266,19 @@ var errorCodeStrings = map[ErrorCode]string{
 	ErrBadCoinbaseHeight:     "ErrBadCoinbaseHeight",
 	ErrScriptMalformed:       "ErrScriptMalformed",
 	ErrScriptValidation:      "ErrScriptValidation",
-	ErrProofOfStakeCheck:     "ErrProofOfStakeCheck",
+
+	// Peercoin
+	ErrProofOfStakeCheck:      "ErrProofOfStakeCheck",
+	ErrEmptyTxOut:             "ErrEmptyTxOut",
+	ErrEarlierTimestamp:       "ErrEarlierTimestamp",
+	ErrBadCoinstakeValue:      "ErrBadCoinstakeValue",
+	ErrInsufficientFee:        "ErrInsufficientFee",
+	ErrWrongCoinstakePosition: "ErrWrongCoinstakePosition",
+	ErrCoinbaseNotEmpty:       "ErrCoinbaseNotEmpty",
+	ErrCoinstakeTimeViolation: "ErrCoinstakeTimeViolation",
+	ErrBlockBeforeTx:          "ErrBlockBeforeTx",
+	ErrBadBlockSignature:      "ErrBadBlockSignature",
+	ErrDuplicateStake:         "ErrDuplicateStake",
 }
 
 // String returns the ErrorCode as a human-readable name.
