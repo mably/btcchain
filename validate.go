@@ -52,18 +52,9 @@ const (
 	// baseSubsidy is the starting subsidy amount for mined blocks.  This
 	// value is halved every SubsidyHalvingInterval blocks.
 	baseSubsidy = 50 * btcutil.SatoshiPerBitcoin
-
-	// CoinbaseMaturity is the number of blocks required before newly
-	// mined bitcoins (coinbase transactions) can be spent.
-	CoinbaseMaturity = 100
 )
 
 var (
-	// coinbaseMaturity is the internal variable used for validating the
-	// spending of coinbase outputs.  A variable rather than the exported
-	// constant is used because the tests need the ability to modify it.
-	coinbaseMaturity = int64(CoinbaseMaturity)
-
 	// zeroHash is the zero value for a btcwire.ShaHash and is defined as
 	// a package level variable to avoid the need to create a new instance
 	// every time a check is needed.
@@ -277,7 +268,11 @@ func CheckTransactionSanity(tx *btcutil.Tx) error {
 			}
 		}
 	}
-
+	// Peercoin - sanity checks
+	ppcErr := ppcCheckTransactionSanity(tx)
+	if ppcErr != nil {
+		return ppcErr
+	}
 	return nil
 }
 
@@ -426,7 +421,7 @@ func CountP2SHSigOps(tx *btcutil.Tx, isCoinBaseTx bool, txStore TxStore) (int, e
 //
 // The flags do not modify the behavior of this function directly, however they
 // are needed to pass along to checkProofOfWork.
-func checkBlockSanity(block *btcutil.Block, powLimit *big.Int, flags BehaviorFlags) error {
+func checkBlockSanity(params *btcnet.Params, block *btcutil.Block, powLimit *big.Int, flags BehaviorFlags) error {
 
 	defer timeTrack(now(), fmt.Sprintf("checkBlockSanity(%v)", slice(block.Sha())[0]))
 
@@ -556,13 +551,19 @@ func checkBlockSanity(block *btcutil.Block, powLimit *big.Int, flags BehaviorFla
 		}
 	}
 
+	// Peercoin checks
+	ppcErr := ppcCheckBlockSanity(params, block)
+	if ppcErr != nil {
+		return ppcErr
+	}
+
 	return nil
 }
 
 // CheckBlockSanity performs some preliminary checks on a block to ensure it is
 // sane before continuing with block processing.  These checks are context free.
-func CheckBlockSanity(block *btcutil.Block, powLimit *big.Int) error {
-	return checkBlockSanity(block, powLimit, BFNone)
+func CheckBlockSanity(params *btcnet.Params, block *btcutil.Block, powLimit *big.Int) error {
+	return checkBlockSanity(params, block, powLimit, BFNone)
 }
 
 // checkSerializedHeight checks if the signature script in the passed
@@ -667,19 +668,13 @@ func (b *BlockChain) checkBIP0030(node *blockNode, block *btcutil.Block) error {
 // amount, and verifying the signatures to prove the spender was the owner of
 // the bitcoins and therefore allowed to spend them.  As it checks the inputs,
 // it also calculates the total fees for the transaction and returns that value.
-func CheckTransactionInputs(tx *btcutil.Tx, txHeight int64, txStore TxStore) (int64, error) {
+func CheckTransactionInputs(tx *btcutil.Tx, txHeight int64, txStore TxStore,
+	blockChain *BlockChain) (int64, error) {
 
 	defer timeTrack(now(), fmt.Sprintf("CheckTransactionInputs(%v)", slice(tx.Sha())[0]))
 
 	// Coinbase transactions have no inputs.
 	if IsCoinBase(tx) {
-		return 0, nil
-	}
-
-	// Coinstake
-	if IsCoinStake(tx) {
-		log.Tracef("CheckTransactionInputs : IsCoinStake %+v", tx.Sha())
-		// TODO verification
 		return 0, nil
 	}
 
@@ -701,12 +696,12 @@ func CheckTransactionInputs(tx *btcutil.Tx, txHeight int64, txStore TxStore) (in
 		if IsCoinBase(originTx.Tx) {
 			originHeight := originTx.BlockHeight
 			blocksSincePrev := txHeight - originHeight
-			if blocksSincePrev < coinbaseMaturity {
+			if blocksSincePrev < blockChain.netParams.CoinbaseMaturity {
 				str := fmt.Sprintf("tried to spend coinbase "+
 					"transaction %v from height %v at "+
 					"height %v before required maturity "+
 					"of %v blocks", txInHash, originHeight,
-					txHeight, coinbaseMaturity)
+					txHeight, blockChain.netParams.CoinbaseMaturity)
 				return 0, ruleError(ErrImmatureSpend, str)
 			}
 		}
@@ -759,6 +754,12 @@ func CheckTransactionInputs(tx *btcutil.Tx, txHeight int64, txStore TxStore) (in
 			return 0, ruleError(ErrBadTxOutValue, str)
 		}
 
+		// Peercoin checks
+		ppcErr := ppcCheckTransactionInput(tx, txIn, originTx)
+		if ppcErr != nil {
+			return 0, ppcErr
+		}
+
 		// Mark the referenced output as spent.
 		originTx.Spent[originTxIndex] = true
 	}
@@ -771,19 +772,34 @@ func CheckTransactionInputs(tx *btcutil.Tx, txHeight int64, txStore TxStore) (in
 		totalSatoshiOut += txOut.Value
 	}
 
-	// Ensure the transaction does not spend more than its inputs.
-	if totalSatoshiIn < totalSatoshiOut {
+	// Ensure the user transaction does not spend more than its inputs.
+	if (!IsCoinStake(tx)) && totalSatoshiIn < totalSatoshiOut {
 		str := fmt.Sprintf("total value of all transaction inputs for "+
 			"transaction %v is %v which is less than the amount "+
 			"spent of %v", txHash, totalSatoshiIn, totalSatoshiOut)
 		return 0, ruleError(ErrSpendTooHigh, str)
 	}
 
+	// Peercoin checks
+	ppcErr := ppcCheckTransactionInputs(tx, txStore, blockChain,
+		totalSatoshiIn, totalSatoshiOut)
+	if ppcErr != nil {
+		return 0, ppcErr
+	}
+
 	// NOTE: bitcoind checks if the transaction fees are < 0 here, but that
 	// is an impossible condition because of the check above that ensures
 	// the inputs are >= the outputs.
 	txFeeInSatoshi := totalSatoshiIn - totalSatoshiOut
+	// TODO(kac-) how to handle it properly?
+	if IsCoinStake(tx) {
+		if txFeeInSatoshi < 0 {
+			return 0, nil
+		}
+		return txFeeInSatoshi, nil
+	}
 	return txFeeInSatoshi, nil
+
 }
 
 // checkConnectBlock performs several checks to confirm connecting the passed
@@ -894,7 +910,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block) er
 	// bounds.
 	var totalFees int64
 	for _, tx := range transactions {
-		txFee, err := CheckTransactionInputs(tx, node.height, txInputStore)
+		txFee, err := CheckTransactionInputs(tx, node.height, txInputStore, b)
 		if err != nil {
 			return err
 		}
@@ -909,22 +925,22 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block) er
 		}
 	}
 
-	// The total output values of the coinbase transaction must not exceed
-	// the expected subsidy value plus total transaction fees gained from
-	// mining the block.  It is safe to ignore overflow and out of range
-	// errors here because those error conditions would have already been
-	// caught by checkTransactionSanity.
-	var totalSatoshiOut int64
-	for _, txOut := range transactions[0].MsgTx().TxOut {
-		totalSatoshiOut += txOut.Value
-	}
-	expectedSatoshiOut := CalcBlockSubsidy(node.height, b.netParams) +
-		totalFees
-	if totalSatoshiOut > expectedSatoshiOut {
-		str := fmt.Sprintf("coinbase transaction for block pays %v "+
-			"which is more than expected value of %v",
-			totalSatoshiOut, expectedSatoshiOut)
-		return ruleError(ErrBadCoinbaseValue, str)
+	if !node.IsProofOfStake() {
+		// The total output values of the coinbase transaction must not exceed
+		// the expected subsidy value.  It is safe to ignore overflow and out of range
+		// errors here because those error conditions would have already been
+		// caught by checkTransactionSanity.
+		var totalSatoshiOut int64
+		for _, txOut := range transactions[0].MsgTx().TxOut {
+			totalSatoshiOut += txOut.Value
+		}
+		expectedSatoshiOut := PPCGetProofOfWorkReward(node.bits, b.netParams)
+		if totalSatoshiOut > expectedSatoshiOut {
+			str := fmt.Sprintf("coinbase transaction for block pays %v "+
+				"which is more than expected value of %v",
+				totalSatoshiOut, expectedSatoshiOut)
+			return ruleError(ErrBadCoinbaseValue, str)
+		}
 	}
 
 	// Don't run scripts if this node is before the latest known good
