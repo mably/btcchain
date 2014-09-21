@@ -27,6 +27,11 @@ const (
 	MaxMoney           int64 = 2000000000 * Coin
 	MaxMintProofOfWork int64 = 9999 * Coin
 	MinTxOutAmount     int64 = MinTxFee
+
+	MAX_BLOCK_SIZE          uint   = 1000000
+	MAX_BLOCK_SIZE_GEN      uint   = MAX_BLOCK_SIZE/2
+    MAX_BLOCK_SIGOPS        uint   = MAX_BLOCK_SIZE/50
+    MAX_ORPHAN_TRANSACTIONS uint   = MAX_BLOCK_SIZE/100
 )
 
 type Stake struct {

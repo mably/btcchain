@@ -23,7 +23,6 @@ const (
 	nModifierIntervalRatio int64 = 3
 	StakeTargetSpacing     int64 = 10 * 60           // 10 minutes
 	StakeMaxAge            int64 = 60 * 60 * 24 * 90 // stake age of full weight
-	COIN                   int64 = 1000000           // util.h
 	MaxClockDrift          int64 = 2 * 60 * 60       // two hours (main.h)
 )
 
@@ -470,7 +469,7 @@ func (b *BlockChain) CheckStakeKernelHash(
 
 	//CBigNum bnCoinDayWeight = CBigNum(nValueIn) * nTimeWeight / COIN / (24 * 60 * 60)
 	var bnCoinDayWeight *big.Int = new(big.Int).Div(new(big.Int).Div(new(big.Int).Mul(
-		big.NewInt(nValueIn), big.NewInt(nTimeWeight)), big.NewInt(COIN)), big.NewInt(24*60*60))
+		big.NewInt(nValueIn), big.NewInt(nTimeWeight)), big.NewInt(Coin)), big.NewInt(24*60*60))
 	/*var bnCoinDayWeight *big.Int = new(big.Int).Div(new(big.Int).Mul(
 	new(big.Int).Div(big.NewtInt(nValueIn), big.NewInt(COIN)),
 		big.NewInt(nTimeWeight)), big.NewInt(24*60*60))*/
@@ -695,8 +694,7 @@ func (b *BlockChain) checkBlockProofOfStake(block *btcutil.Block) error {
 		hashProofOfStake, err :=
 			b.checkTxProofOfStake(tx, block.MsgBlock().Header.Bits)
 		if err != nil {
-			str := fmt.Sprintf("Proof of stake check failed for block %v : %v", blockHash, err)
-			return ruleError(ErrProofOfStakeCheck, str)
+			return err
 		} else {
 			SetProofOfStake(block.Meta(), true) // Important: flags
 			block.Meta().HashProofOfStake = *hashProofOfStake

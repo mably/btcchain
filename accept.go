@@ -146,6 +146,20 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, flags BehaviorFlags)
 		}
 	}
 
+	// ppcoin: verify hash target and signature of coinstake tx
+	// TODO is it the best place to do that?
+	err = b.checkBlockProofOfStake(block)
+	if err != nil {
+		str := fmt.Sprintf("Proof of stake check failed for block %v : %v", blockHash, err)
+		return ruleError(ErrProofOfStakeCheck, str)
+	}
+
+	// ppcoin: populate all ppcoin specific block meta data
+	err = b.AddToBlockIndex(block)
+	if err != nil {
+		return err
+	}
+
 	// Prune block nodes which are no longer needed before creating
 	// a new node.
 	if !dryRun {
@@ -153,12 +167,6 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, flags BehaviorFlags)
 		if err != nil {
 			return err
 		}
-	}
-
-	// ppcoin: populate all ppcoin specific block meta data
-	err = b.AddToBlockIndex(block)
-	if err != nil {
-		return err
 	}
 
 	// Create a new block node for the block and add it to the in-memory
