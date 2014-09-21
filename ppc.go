@@ -50,7 +50,7 @@ func GetProofOfStakeFromBlock(block *btcutil.Block) Stake {
 }
 
 var ZeroSha = btcwire.ShaHash{}
-var stakeSeen, stakeSeenOrphan map[Stake]bool
+var stakeSeen, stakeSeenOrphan = make(map[Stake]bool), make(map[Stake]bool)
 
 // getBlockNode try to obtain a node form the memory block chain and loads it
 // form the database in not found in memory.
