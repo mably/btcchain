@@ -219,6 +219,11 @@ const (
 
 	// ErrBadBlockSignature indicates the block signature is invalid.
 	ErrBadBlockSignature
+
+	// ErrDuplicateStake indicates the stake used in proof-of-stake block
+	// was already used and block was rejected to prevent block-flood
+	// attack.
+	ErrDuplicateStake
 )
 
 // Map of ErrorCode values back to their constant names for pretty printing.
@@ -273,6 +278,7 @@ var errorCodeStrings = map[ErrorCode]string{
 	ErrCoinstakeTimeViolation: "ErrCoinstakeTimeViolation",
 	ErrBlockBeforeTx:          "ErrBlockBeforeTx",
 	ErrBadBlockSignature:      "ErrBadBlockSignature",
+	ErrDuplicateStake:         "ErrDuplicateStake",
 }
 
 // String returns the ErrorCode as a human-readable name.

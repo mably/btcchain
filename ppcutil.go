@@ -12,8 +12,8 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/mably/btcutil"
 	"github.com/mably/btcnet"
+	"github.com/mably/btcutil"
 )
 
 const (
@@ -73,12 +73,6 @@ func (b *BlockChain) AddToBlockIndex(block *btcutil.Block) (err error) {
 		err = fmt.Errorf("AddToBlockIndex() : Rejected by stake modifier checkpoint height=%d, modifier=%d", block.Height(), meta.StakeModifier)
 		return
 	}
-
-	/* kac-temp-off
-	if block.IsProofOfStake() {
-		setStakeSeen.insert(make_pair(block.prevoutStake, block.nStakeTime)) // TODO later to prevent block flood
-	}
-	*/
 
 	return nil
 }

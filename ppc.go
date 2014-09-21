@@ -29,7 +29,28 @@ const (
 	MinTxOutAmount     int64 = MinTxFee
 )
 
+type Stake struct {
+	outPoint btcwire.OutPoint
+	time     int64
+}
+
+type processPhase int
+
+const (
+	phasePreSanity processPhase = iota
+)
+
+func GetProofOfStakeFromBlock(block *btcutil.Block) Stake {
+	if block.IsProofOfStake() {
+		tx := block.Transactions()[1].MsgTx()
+		return Stake{tx.TxIn[0].PreviousOutpoint, tx.Time.Unix()}
+	} else {
+		return Stake{}
+	}
+}
+
 var ZeroSha = btcwire.ShaHash{}
+var stakeSeen, stakeSeenOrphan map[Stake]bool
 
 // getBlockNode try to obtain a node form the memory block chain and loads it
 // form the database in not found in memory.
@@ -639,6 +660,64 @@ func ppcCheckBlockSanity(params *btcnet.Params, block *btcutil.Block) error {
 	if !CheckBlockSignature(msgBlock, params) {
 		str := "bad block signature"
 		return ruleError(ErrBadBlockSignature, str)
+	}
+	return nil
+}
+
+func (b *BlockChain) ppcProcessOrphan(block *btcutil.Block) error {
+	// https://github.com/ppcoin/ppcoin/blob/v0.4.0ppc/src/main.cpp#L2036
+	// ppc: check proof-of-stake
+	if block.IsProofOfStake() {
+		// Limited duplicity on stake: prevents block flood attack
+		// Duplicate stake allowed only when there is orphan child block
+		sha, err := block.Sha()
+		if err != nil {
+			return err
+		}
+		stake := GetProofOfStakeFromBlock(block)
+		_, seen := stakeSeen[stake]
+		childs, hasChild := b.prevOrphans[*sha]
+		hasChild = hasChild && (len(childs) > 0)
+		if seen && !hasChild {
+			str := fmt.Sprintf("duplicate proof-of-stake (%v) for orphan block %s", stake, sha)
+			return ruleError(ErrDuplicateStake, str)
+		} else {
+			stakeSeenOrphan[stake] = true
+		}
+	}
+	// TODO(kac-:dup-stake)
+	// there is explicit Ask for block not handled now
+	// https://github.com/ppcoin/ppcoin/blob/v0.4.0ppc/src/main.cpp#L2055
+	return nil
+}
+
+func (b *BlockChain) ppcOrphanBlockRemoved(block *btcutil.Block) {
+	// https://github.com/ppcoin/ppcoin/blob/v0.4.0ppc/src/main.cpp#L2078
+	delete(stakeSeenOrphan, GetProofOfStakeFromBlock(block))
+}
+
+func (b *BlockChain) ppcProcessBlock(block *btcutil.Block, phase processPhase) error {
+	switch phase {
+	case phasePreSanity:
+		// https://github.com/ppcoin/ppcoin/blob/v0.4.0ppc/src/main.cpp#L1985
+		// ppc: check proof-of-stake
+		// Limited duplicity on stake: prevents block flood attack
+		// Duplicate stake allowed only when there is orphan child block
+		// TODO(kac-) should it be exported to limitedStakeDuplicityCheck(block)error ?
+		if block.IsProofOfStake() {
+			sha, err := block.Sha()
+			if err != nil {
+				return err
+			}
+			stake := GetProofOfStakeFromBlock(block)
+			_, seen := stakeSeen[stake]
+			childs, hasChild := b.prevOrphans[*sha]
+			hasChild = hasChild && (len(childs) > 0)
+			if seen && !hasChild {
+				str := fmt.Sprintf("duplicate proof-of-stake (%v) for orphan block %s", stake, sha)
+				return ruleError(ErrDuplicateStake, str)
+			}
+		}
 	}
 	return nil
 }
