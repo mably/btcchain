@@ -16,6 +16,7 @@ import (
 	"github.com/mably/btcscript"
 	"github.com/mably/btcutil"
 	"github.com/mably/btcwire"
+	"github.com/mably/btcnet"
 )
 
 const (
@@ -716,6 +717,16 @@ func (b *BlockChain) CheckCoinStakeTimestamp(
 	nTimeBlock int64, nTimeTx int64) bool {
 
 	if isProtocolV03(b, nTimeTx) { // v0.3 protocol
+		return (nTimeBlock == nTimeTx)
+	} else { // v0.2 protocol
+		return ((nTimeTx <= nTimeBlock) && (nTimeBlock <= nTimeTx+MaxClockDrift))
+	}
+}
+
+func CheckCoinStakeTimestamp(params *btcnet.Params,
+	nTimeBlock int64, nTimeTx int64) bool {
+
+	if isProtocolV03FromParams(params, nTimeTx) { // v0.3 protocol
 		return (nTimeBlock == nTimeTx)
 	} else { // v0.2 protocol
 		return ((nTimeTx <= nTimeBlock) && (nTimeBlock <= nTimeTx+MaxClockDrift))

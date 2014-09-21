@@ -12,6 +12,7 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/mably/btcnet"
 	"github.com/mably/btcutil"
 )
 
@@ -36,15 +37,6 @@ func (b *BlockChain) AddToBlockIndex(block *btcutil.Block) (err error) {
 	defer timeTrack(now(), fmt.Sprintf("AddToBlockIndex(%v)", slice(block.Sha())[0]))
 
 	meta := block.Meta()
-
-	// ppcoin: compute chain trust score TODO needed here?
-	blockTrust := getBlockTrust(block)
-	prevNode, err := b.getPrevNodeFromBlock(block)
-	if err != nil || prevNode == nil {
-		meta.ChainTrust.Set(blockTrust)
-	} else {
-		meta.ChainTrust.Add(&prevNode.meta.ChainTrust, blockTrust)
-	}
 
 	// ppcoin: compute stake entropy bit for stake modifier
 	stakeEntropyBit, err := getStakeEntropyBit(b, block)
@@ -81,12 +73,6 @@ func (b *BlockChain) AddToBlockIndex(block *btcutil.Block) (err error) {
 		err = fmt.Errorf("AddToBlockIndex() : Rejected by stake modifier checkpoint height=%d, modifier=%d", block.Height(), meta.StakeModifier)
 		return
 	}
-
-	/* kac-temp-off
-	if block.IsProofOfStake() {
-		setStakeSeen.insert(make_pair(block.prevoutStake, block.nStakeTime)) // TODO later to prevent block flood
-	}
-	*/
 
 	return nil
 }
@@ -150,6 +136,17 @@ func getStakeModifierCSHexString(stakeModifierCS uint32) string {
 func isProtocolV03(b *BlockChain, nTime int64) bool {
 	var switchTime int64
 	if b.netParams.Name == "testnet3" {
+		switchTime = nProtocolV03TestSwitchTime
+	} else {
+		switchTime = nProtocolV03SwitchTime
+	}
+	return nTime >= switchTime
+}
+
+// isProtocolV03FromParams
+func isProtocolV03FromParams(params *btcnet.Params, nTime int64) bool {
+	var switchTime int64
+	if params.Name == "testnet3" {
 		switchTime = nProtocolV03TestSwitchTime
 	} else {
 		switchTime = nProtocolV03SwitchTime
