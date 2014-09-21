@@ -778,8 +778,14 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block) error {
 	block.Meta().ChainTrust = *node.workSum
 	//log.Debugf("Block %v trust = %v", node.height, node.workSum)
 
+	// ppcoin: calculate block mint and money supply
+	err := b.CalcMintAndMoneySupply(node, block)
+	if err != nil {
+		return err
+	}
+
 	// Insert the block into the database which houses the main chain.
-	_, err := b.db.InsertBlock(block)
+	_, err = b.db.InsertBlock(block)
 	if err != nil {
 		return err
 	}
