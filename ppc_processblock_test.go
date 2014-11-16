@@ -35,9 +35,10 @@ func TestPPCProcessBlocks(t *testing.T) {
 	//blocks, _ := _loadBlocks(t, "blocks1-1536.bz2")
 	blocks, _ := _loadBlocksMax(t, "blocks1-6504", 6504, 1)
 	//blocks, _ := _loadBlocksMax(t, "blk0001.dat", 10000, 1)
+	timeSource := btcchain.NewMedianTime()
 	for h, block := range blocks {
 		sha, _ := block.Sha()
-		isOrphan, err := bc.ProcessBlock(block, btcchain.BFNone)
+		isOrphan, err := bc.ProcessBlock(block, timeSource, btcchain.BFNone)
 		if err != nil {
 			t.Errorf("processBlock: block %v %v", h, err)
 			return
