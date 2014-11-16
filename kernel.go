@@ -625,7 +625,7 @@ func (b *BlockChain) checkTxProofOfStake(tx *btcutil.Tx, nBits uint32) (
 		return
 	}
 	var prevBlockHeight int64
-	if txPrevData, ok := txStore[txin.PreviousOutpoint.Hash]; ok {
+	if txPrevData, ok := txStore[txin.PreviousOutPoint.Hash]; ok {
 		prevBlockHeight = txPrevData.BlockHeight
 	} else {
 		//return tx.DoS(1, error("CheckProofOfStake() : INFO: read txPrev failed"))  // previous transaction not in main chain, may occur during initial download
@@ -657,13 +657,13 @@ func (b *BlockChain) checkTxProofOfStake(tx *btcutil.Tx, nBits uint32) (
 
 	success := false
 	for _, txPrev := range prevBlock.Transactions() {
-		if txPrev.Sha().IsEqual(&txin.PreviousOutpoint.Hash) {
+		if txPrev.Sha().IsEqual(&txin.PreviousOutPoint.Hash) {
 			fDebug := true
 			//nTxPrevOffset uint := txindex.pos.nTxPos - txindex.pos.nBlockPos
 			prevBlockTxLoc, _ := prevBlock.TxLoc() // TODO not optimal way
 			var nTxPrevOffset uint32 = uint32(prevBlockTxLoc[txPrev.Index()].TxStart)
 			hashProofOfStake, success, err = b.CheckStakeKernelHash(
-				nBits, prevBlock, nTxPrevOffset, txPrev, &txin.PreviousOutpoint,
+				nBits, prevBlock, nTxPrevOffset, txPrev, &txin.PreviousOutPoint,
 				msgTx.Time.Unix(), fDebug)
 			if err != nil {
 				return

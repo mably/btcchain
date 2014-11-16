@@ -43,7 +43,7 @@ const (
 func GetProofOfStakeFromBlock(block *btcutil.Block) Stake {
 	if block.IsProofOfStake() {
 		tx := block.Transactions()[1].MsgTx()
-		return Stake{tx.TxIn[0].PreviousOutpoint, tx.Time.Unix()}
+		return Stake{tx.TxIn[0].PreviousOutPoint, tx.Time.Unix()}
 	} else {
 		return Stake{}
 	}
@@ -216,9 +216,9 @@ func (b *BlockChain) CalcMintAndMoneySupply(node *blockNode, block *btcutil.Bloc
 		} else {
 			var nTxValueIn int64 = 0
 			for _, txIn := range tx.MsgTx().TxIn {
-				txInHash := &txIn.PreviousOutpoint.Hash
+				txInHash := &txIn.PreviousOutPoint.Hash
 				originTx, _ := txStore[*txInHash]
-				originTxIndex := txIn.PreviousOutpoint.Index
+				originTxIndex := txIn.PreviousOutPoint.Index
 				originTxSatoshi := originTx.Tx.MsgTx().TxOut[originTxIndex].Value
 				nTxValueIn += originTxSatoshi
 			}
@@ -269,7 +269,7 @@ func (b *BlockChain) GetCoinAgeTx(tx *btcutil.Tx, txStore TxStore) (uint64, erro
 
 	for _, txIn := range tx.MsgTx().TxIn {
 		// First try finding the previous transaction in database
-		txInHash := &txIn.PreviousOutpoint.Hash
+		txInHash := &txIn.PreviousOutPoint.Hash
 		txPrev, ok := txStore[*txInHash]
 		if !ok || txPrev.Tx == nil {
 			continue // previous transaction not in main chain
@@ -297,7 +297,7 @@ func (b *BlockChain) GetCoinAgeTx(tx *btcutil.Tx, txStore TxStore) (uint64, erro
 			continue // only count coins meeting min age requirement
 		}
 
-		txPrevIndex := txIn.PreviousOutpoint.Index
+		txPrevIndex := txIn.PreviousOutPoint.Index
 		nValueIn := txPrev.Tx.MsgTx().TxOut[txPrevIndex].Value
 		bnCentSecond.Add(bnCentSecond,
 			new(big.Int).Div(new(big.Int).Mul(big.NewInt(nValueIn), big.NewInt((nTime-txPrevTime))),
