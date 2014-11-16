@@ -120,7 +120,7 @@ func (b *BlockChain) processOrphans(hash *btcwire.ShaHash, flags BehaviorFlags) 
 // It returns a bool which indicates whether or not the block is an orphan and
 // any errors that occurred during processing.  The returned bool is only valid
 // when the error is nil.
-func (b *BlockChain) ProcessBlock(block *btcutil.Block, flags BehaviorFlags) (bool, error) {
+func (b *BlockChain) ProcessBlock(block *btcutil.Block, timeSource MedianTimeSource, flags BehaviorFlags) (bool, error) {
 
 	defer timeTrack(now(), fmt.Sprintf("ProcessBlock(%v)", slice(block.Sha())[0]))
 
@@ -156,7 +156,7 @@ func (b *BlockChain) ProcessBlock(block *btcutil.Block, flags BehaviorFlags) (bo
 	}
 
 	// Perform preliminary sanity checks on the block and its transactions.
-	err = checkBlockSanity(b.netParams, block, b.netParams.PowLimit, flags)
+	err = checkBlockSanity(b.netParams, block, b.netParams.PowLimit, timeSource, flags)
 	if err != nil {
 		return false, err
 	}
