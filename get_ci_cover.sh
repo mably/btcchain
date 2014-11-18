@@ -1,5 +1,4 @@
 #!/bin/bash
-
 set -evx
 if [ "$TRAVIS_GO_VERSION" = "tip" ]; then
     go get -v golang.org/x/tools/cmd/cover
