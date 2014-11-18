@@ -137,10 +137,6 @@ func minInt64(a int64, b int64) int64 {
 	return b
 }
 
-func getAdjustedTime() int64 {
-	return time.Now().Unix() // TODO differs from ppcoin, probably already exists in btcd
-}
-
 func now() time.Time {
 	return btcutil.Now()
 }

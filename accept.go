@@ -19,7 +19,7 @@ import (
 //  - BFFastAdd: The somewhat expensive BIP0034 validation is not performed.
 //  - BFDryRun: The memory chain index will not be pruned and no accept
 //    notification will be sent since the block is not being accepted.
-func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, flags BehaviorFlags) error {
+func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, timeSource MedianTimeSource, flags BehaviorFlags) error {
 
 	defer timeTrack(now(), fmt.Sprintf("maybeAcceptBlock(%v)", slice(block.Sha())[0]))
 
@@ -144,6 +144,21 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, flags BehaviorFlags)
 				}
 			}
 		}
+	}
+
+	// ppc: verify hash target and signature of coinstake tx
+	// TODO(mably) is it the best place to do that?
+	// TODO(mably) a timeSource param is needed to get the AdjustedTime
+	err = b.checkBlockProofOfStake(block, timeSource)
+	if err != nil {
+		str := fmt.Sprintf("Proof of stake check failed for block %v : %v", blockHash, err)
+		return ruleError(ErrProofOfStakeCheck, str)
+	}
+
+	// ppc: populate all ppcoin specific block meta data
+	err = b.AddToBlockIndex(block)
+	if err != nil {
+		return err
 	}
 
 	// Prune block nodes which are no longer needed before creating

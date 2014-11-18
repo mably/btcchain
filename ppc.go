@@ -7,6 +7,7 @@ package btcchain
 import (
 	"fmt"
 	"github.com/conformal/btcec"
+	"github.com/mably/btcdb"
 	"github.com/mably/btcnet"
 	"github.com/mably/btcscript"
 	"github.com/mably/btcutil"

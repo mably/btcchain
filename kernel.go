@@ -437,7 +437,7 @@ func (b *BlockChain) getKernelStakeModifier(
 		if blockHeight >= b.bestChain.height { // reached best block; may happen if node is behind on block chain
 			blockTimestamp := block.Timestamp.Unix()
 			if fPrintProofOfStake || (blockTimestamp+b.netParams.StakeMinAge-nStakeModifierSelectionInterval > timeSource.AdjustedTime().Unix()) {
-				err = fmt.Errorf("getKernelStakeModifier() : reached best block %v at height %v from block %v",
+				err = fmt.Errorf("GetKernelStakeModifier() : reached best block %v at height %v from block %v",
 					btcutil.Slice(blockSha)[0], blockHeight, hashBlockFrom)
 				return
 			}
@@ -487,7 +487,7 @@ func (b *BlockChain) getKernelStakeModifier(
 func (b *BlockChain) checkStakeKernelHash(
 	nBits uint32, blockFrom *btcutil.Block, nTxPrevOffset uint32,
 	txPrev *btcutil.Tx, prevout *btcwire.OutPoint, nTimeTx int64,
-	fPrintProofOfStake bool) (
+	timeSource MedianTimeSource, fPrintProofOfStake bool) (
 	hashProofOfStake *btcwire.ShaHash, success bool, err error) {
 
 	defer timeTrack(now(), fmt.Sprintf("checkStakeKernelHash(%v)", slice(blockFrom.Sha())[0]))
@@ -654,7 +654,7 @@ func (b *BlockChain) checkStakeKernelHash(
 }
 
 // Check kernel hash target and coinstake signature
-func (b *BlockChain) checkTxProofOfStake(tx *btcutil.Tx, nBits uint32) (
+func (b *BlockChain) checkTxProofOfStake(tx *btcutil.Tx, timeSource MedianTimeSource, nBits uint32) (
 	hashProofOfStake *btcwire.ShaHash, err error) {
 
 	defer timeTrack(now(), fmt.Sprintf("CheckProofOfStake(%v)", slice(tx.Sha())[0]))
@@ -714,7 +714,7 @@ func (b *BlockChain) checkTxProofOfStake(tx *btcutil.Tx, nBits uint32) (
 			nTxPrevOffset := uint32(prevBlockTxLoc[txPrev.Index()].TxStart)
 			hashProofOfStake, success, err = b.checkStakeKernelHash(
 				nBits, prevBlock, nTxPrevOffset, txPrev, &txin.PreviousOutPoint,
-				msgTx.Time.Unix(), fDebug)
+				msgTx.Time.Unix(), timeSource, fDebug)
 			if err != nil {
 				return
 			}
@@ -734,7 +734,7 @@ func (b *BlockChain) checkTxProofOfStake(tx *btcutil.Tx, nBits uint32) (
 }
 
 // checkBlockProofOfStake
-func (b *BlockChain) checkBlockProofOfStake(block *btcutil.Block) error {
+func (b *BlockChain) checkBlockProofOfStake(block *btcutil.Block, timeSource MedianTimeSource) error {
 
 	if block.MsgBlock().IsProofOfStake() {
 
@@ -746,7 +746,7 @@ func (b *BlockChain) checkBlockProofOfStake(block *btcutil.Block) error {
 		if err != nil { return err }
 
 		hashProofOfStake, err :=
-			b.checkTxProofOfStake(tx, block.MsgBlock().Header.Bits)
+			b.checkTxProofOfStake(tx, timeSource, block.MsgBlock().Header.Bits)
 		if err != nil {
 			return err
 		}

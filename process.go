@@ -55,7 +55,7 @@ func (b *BlockChain) blockExists(hash *btcwire.ShaHash) (bool, error) {
 //
 // The flags do not modify the behavior of this function directly, however they
 // are needed to pass along to maybeAcceptBlock.
-func (b *BlockChain) processOrphans(hash *btcwire.ShaHash, flags BehaviorFlags) error {
+func (b *BlockChain) processOrphans(hash *btcwire.ShaHash, timeSource MedianTimeSource, flags BehaviorFlags) error {
 
 	defer timeTrack(now(), fmt.Sprintf("processOrphans(%v)", hash))
 
@@ -98,7 +98,7 @@ func (b *BlockChain) processOrphans(hash *btcwire.ShaHash, flags BehaviorFlags) 
 			b.ppcOrphanBlockRemoved(orphan.block)
 
 			// Potentially accept the block into the block chain.
-			err := b.maybeAcceptBlock(orphan.block, flags)
+			err := b.maybeAcceptBlock(orphan.block, timeSource, flags)
 			if err != nil {
 				return err
 			}
@@ -163,7 +163,7 @@ func (b *BlockChain) ProcessBlock(block *btcutil.Block, timeSource MedianTimeSou
 
 	// ppcoin: verify hash target and signature of coinstake tx
 	// TODO is it the best place to do that?
-	err = b.checkBlockProofOfStake(block)
+	err = b.checkBlockProofOfStake(block, timeSource)
 	if err != nil {
 		return false, err
 	}
@@ -234,7 +234,7 @@ func (b *BlockChain) ProcessBlock(block *btcutil.Block, timeSource MedianTimeSou
 
 	// The block has passed all context independent checks and appears sane
 	// enough to potentially accept it into the block chain.
-	err = b.maybeAcceptBlock(block, flags)
+	err = b.maybeAcceptBlock(block, timeSource, flags)
 	if err != nil {
 		return false, err
 	}
@@ -244,7 +244,7 @@ func (b *BlockChain) ProcessBlock(block *btcutil.Block, timeSource MedianTimeSou
 		// Accept any orphan blocks that depend on this block (they are
 		// no longer orphans) and repeat for those accepted blocks until
 		// there are no more.
-		err := b.processOrphans(blockHash, flags)
+		err := b.processOrphans(blockHash, timeSource, flags)
 		if err != nil {
 			return false, err
 		}
