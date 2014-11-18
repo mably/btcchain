@@ -591,7 +591,7 @@ func ppcCheckTransactionInputs(tx *btcutil.Tx, txStore TxStore, blockChain *Bloc
 		// 	return fBlock? DoS(100, error("ConnectInputs() : %s not paying required fee=%s, paid=%s", GetHash().ToString().substr(0,10).c_str(), FormatMoney(GetMinFee()).c_str(), FormatMoney(nTxFee).c_str())) : false;
 		txFee := satoshiIn - satoshiOut
 		if txFee < GetMinFee(tx) {
-			str := fmt.Sprintf("%v not paying required fee=%s, paid=%s", tx.Sha(), GetMinFee(tx), txFee)
+			str := fmt.Sprintf("%v not paying required fee=%v, paid=%v", tx.Sha(), GetMinFee(tx), txFee)
 			return ruleError(ErrInsufficientFee, str)
 		}
 	}
@@ -640,7 +640,7 @@ func ppcCheckBlockSanity(params *btcnet.Params, block *btcutil.Block) error {
 	// 	return DoS(50, error("CheckBlock() : coinstake timestamp violation nTimeBlock=%u nTimeTx=%u", GetBlockTime(), vtx[1].nTime));
 	if msgBlock.IsProofOfStake() && !CheckCoinStakeTimestamp(params, msgBlock.Header.Timestamp.Unix(),
 		msgBlock.Transactions[1].Time.Unix()) {
-		str := fmt.Sprintf("coinstake timestamp violation TimeBlock=%u TimeTx=%u",
+		str := fmt.Sprintf("coinstake timestamp violation TimeBlock=%v TimeTx=%v",
 			msgBlock.Header.Timestamp, msgBlock.Transactions[1].Time)
 		return ruleError(ErrCoinstakeTimeViolation, str)
 	}
