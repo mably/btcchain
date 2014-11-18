@@ -5,7 +5,8 @@ go:
   - tip
 install:
   - go get -d -t -v ./...
-  - go get -v code.google.com/p/go.tools/cmd/vet
+  - ./get_ci_vet.sh
+  - ./get_ci_cover.sh
   - go get -v github.com/GeertJohan/fgt
   - go get -v github.com/golang/lint/golint
 script:

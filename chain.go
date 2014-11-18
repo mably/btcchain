@@ -29,11 +29,6 @@ const (
 	// to determine when it's safe to prune nodes from memory without
 	// causing constant dynamic reloading.
 	minMemoryNodes = BlocksPerRetarget
-
-	// Peercoin blockNode flags
-	FBlockProofOfStake  = uint32(1 << 0)
-	FBlockStakeEntropy  = uint32(1 << 1) // entropy bit for stake modifier
-	FBlockStakeModifier = uint32(1 << 2) // regenerated stake modifier
 )
 
 // ErrIndexAlreadyInitialized describes an error that indicates the block index
