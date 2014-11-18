@@ -1,6 +1,5 @@
-#!/usr/bin/env sh
+#!/bin/sh -eux
 
-set -x
 if [ "$TRAVIS_GO_VERSION" = "tip" ]; then
     go get -v golang.org/x/tools/cmd/cover
 else
