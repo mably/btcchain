@@ -73,25 +73,25 @@ func (s blockTimeHashSorter) Less(i, j int) bool {
 }
 
 // Get the last stake modifier and its generation time from a given block
-func (b *BlockChain) GetLastStakeModifier(pindex *blockNode) (
+func (b *BlockChain) getLastStakeModifier(pindex *blockNode) (
 	nStakeModifier uint64, nModifierTime int64, err error) {
 
-	defer timeTrack(now(), fmt.Sprintf("GetLastStakeModifier(%v)", pindex.hash))
+	defer timeTrack(now(), fmt.Sprintf("getLastStakeModifier(%v)", pindex.hash))
 
 	if pindex == nil {
-		err = errors.New("GetLastStakeModifier: nil pindex")
+		err = errors.New("getLastStakeModifier: nil pindex")
 		return
 	}
 
-	for !pindex.parentHash.IsEqual(zeroHash) && !IsGeneratedStakeModifier(pindex.meta) {
+	for !pindex.parentHash.IsEqual(zeroHash) && !isGeneratedStakeModifier(pindex.meta) {
 		pindex, err = b.getPrevNodeFromNode(pindex)
 		if err != nil {
 			return
 		}
 	}
 
-	if !IsGeneratedStakeModifier(pindex.meta) {
-		err = errors.New("GetLastStakeModifier: no generation at genesis block")
+	if !isGeneratedStakeModifier(pindex.meta) {
+		err = errors.New("getLastStakeModifier: no generation at genesis block")
 		return
 	}
 
@@ -111,7 +111,7 @@ func getStakeModifierSelectionIntervalSection(b *BlockChain, nSection int) int64
 
 // Get stake modifier selection interval (in seconds)
 func getStakeModifierSelectionInterval(b *BlockChain) int64 {
-	var nSelectionInterval int64 = 0
+	nSelectionInterval := int64(0)
 	for nSection := 0; nSection < 64; nSection++ {
 		nSelectionInterval += getStakeModifierSelectionIntervalSection(b, nSection)
 	}
@@ -129,7 +129,7 @@ func selectBlockFromCandidates(
 
 	defer timeTrack(now(), fmt.Sprintf("selectBlockFromCandidates"))
 
-	var hashBest *btcwire.ShaHash = new(btcwire.ShaHash)
+	hashBest := new(btcwire.ShaHash)
 	fSelected := false
 
 	for _, item := range vSortedByTimestamp {
@@ -213,10 +213,10 @@ func selectBlockFromCandidates(
 // block. This is to make it difficult for an attacker to gain control of
 // additional bits in the stake modifier, even after generating a chain of
 // blocks.
-func (b *BlockChain) ComputeNextStakeModifier(pindexCurrent *btcutil.Block) (
+func (b *BlockChain) computeNextStakeModifier(pindexCurrent *btcutil.Block) (
 	nStakeModifier uint64, fGeneratedStakeModifier bool, err error) {
 
-	defer timeTrack(now(), fmt.Sprintf("ComputeNextStakeModifier(%v)", slice(pindexCurrent.Sha())[0]))
+	defer timeTrack(now(), fmt.Sprintf("computeNextStakeModifier(%v)", slice(pindexCurrent.Sha())[0]))
 
 	nStakeModifier = 0
 	fGeneratedStakeModifier = false
@@ -237,17 +237,17 @@ func (b *BlockChain) ComputeNextStakeModifier(pindexCurrent *btcutil.Block) (
 
 	// First find current stake modifier and its generation block time
 	// if it's not old enough, return the same stake modifier
-	var nModifierTime int64 = 0
-	nStakeModifier, nModifierTime, stakeErr := b.GetLastStakeModifier(pindexPrev)
+	nModifierTime := int64(0)
+	nStakeModifier, nModifierTime, stakeErr := b.getLastStakeModifier(pindexPrev)
 	if stakeErr != nil {
-		err = fmt.Errorf("ComputeNextStakeModifier: unable to get last modifier: %v", stakeErr)
+		err = fmt.Errorf("computeNextStakeModifier: unable to get last modifier: %v", stakeErr)
 		return
 	}
 
-	log.Debugf("ComputeNextStakeModifier: prev modifier=%d time=%s epoch=%d\n", nStakeModifier, dateTimeStrFormat(nModifierTime), uint(nModifierTime))
+	log.Debugf("computeNextStakeModifier: prev modifier=%d time=%s epoch=%d\n", nStakeModifier, dateTimeStrFormat(nModifierTime), uint(nModifierTime))
 
 	if (nModifierTime / b.netParams.ModifierInterval) >= (pindexPrev.timestamp.Unix() / b.netParams.ModifierInterval) {
-		log.Debugf("ComputeNextStakeModifier: no new interval keep current modifier: pindexPrev nHeight=%d nTime=%d", pindexPrev.height, pindexPrev.timestamp.Unix())
+		log.Debugf("computeNextStakeModifier: no new interval keep current modifier: pindexPrev nHeight=%d nTime=%d", pindexPrev.height, pindexPrev.timestamp.Unix())
 		return
 	}
 
@@ -255,27 +255,27 @@ func (b *BlockChain) ComputeNextStakeModifier(pindexCurrent *btcutil.Block) (
 	if (nModifierTime / b.netParams.ModifierInterval) >= (pindexCurrentHeader.Timestamp.Unix() / b.netParams.ModifierInterval) {
 		// v0.4+ requires current block timestamp also be in a different modifier interval
 		if isProtocolV04(b, pindexCurrentHeader.Timestamp.Unix()) {
-			log.Debugf("ComputeNextStakeModifier: (v0.4+) no new interval keep current modifier: pindexCurrent nHeight=%d nTime=%d", pindexCurrent.Height(), pindexCurrentHeader.Timestamp.Unix())
+			log.Debugf("computeNextStakeModifier: (v0.4+) no new interval keep current modifier: pindexCurrent nHeight=%d nTime=%d", pindexCurrent.Height(), pindexCurrentHeader.Timestamp.Unix())
 			return
-		} else {
-			currentSha, errSha := pindexCurrent.Sha()
-			if errSha != nil {
-				err = errSha
-				return
-			}
-			log.Debugf("ComputeNextStakeModifier: v0.3 modifier at block %s not meeting v0.4+ protocol: pindexCurrent nHeight=%d nTime=%d", currentSha.String(), pindexCurrent.Height(), pindexCurrentHeader.Timestamp.Unix())
 		}
+		currentSha, errSha := pindexCurrent.Sha()
+		if errSha != nil {
+			err = errSha
+			return
+		}
+		log.Debugf("computeNextStakeModifier: v0.3 modifier at block %s not meeting v0.4+ protocol: pindexCurrent nHeight=%d nTime=%d", currentSha.String(), pindexCurrent.Height(), pindexCurrentHeader.Timestamp.Unix())
 	}
 
 	// Sort candidate blocks by timestamp
 	// TODO(kac-) ouch
 	//var vSortedByTimestamp []blockTimeHash = make([]blockTimeHash, 64*nModifierInterval/StakeTargetSpacing)
-	var vSortedByTimestamp []blockTimeHash = make([]blockTimeHash, 0)
+	//vSortedByTimestamp := make([]blockTimeHash, 0)
+	var vSortedByTimestamp []blockTimeHash // golint suggestion
 	//vSortedByTimestamp.reserve(64 * nModifierInterval / STAKE_TARGET_SPACING)
-	var nSelectionInterval int64 = getStakeModifierSelectionInterval(b)
-	var nSelectionIntervalStart int64 = (pindexPrev.timestamp.Unix()/b.netParams.ModifierInterval)*b.netParams.ModifierInterval - nSelectionInterval
-	log.Debugf("ComputeNextStakeModifier: nSelectionInterval = %d, nSelectionIntervalStart = %s[%d]", nSelectionInterval, dateTimeStrFormat(nSelectionIntervalStart), nSelectionIntervalStart)
-	var pindex *blockNode = pindexPrev
+	nSelectionInterval := getStakeModifierSelectionInterval(b)
+	nSelectionIntervalStart := (pindexPrev.timestamp.Unix()/b.netParams.ModifierInterval)*b.netParams.ModifierInterval - nSelectionInterval
+	log.Debugf("computeNextStakeModifier: nSelectionInterval = %d, nSelectionIntervalStart = %s[%d]", nSelectionInterval, dateTimeStrFormat(nSelectionIntervalStart), nSelectionIntervalStart)
+	pindex := pindexPrev
 	for pindex != nil && (pindex.timestamp.Unix() >= nSelectionIntervalStart) {
 		vSortedByTimestamp = append(vSortedByTimestamp,
 			blockTimeHash{pindex.timestamp.Unix(), pindex.hash})
@@ -288,9 +288,9 @@ func (b *BlockChain) ComputeNextStakeModifier(pindexCurrent *btcutil.Block) (
 	sort.Sort(blockTimeHashSorter(vSortedByTimestamp))
 
 	// Select 64 blocks from candidate blocks to generate stake modifier
-	var nStakeModifierNew uint64 = 0
-	var nSelectionIntervalStop int64 = nSelectionIntervalStart
-	var mapSelectedBlocks map[*btcwire.ShaHash]*blockNode = make(map[*btcwire.ShaHash]*blockNode)
+	nStakeModifierNew := uint64(0)
+	nSelectionIntervalStop := nSelectionIntervalStart
+	mapSelectedBlocks := make(map[*btcwire.ShaHash]*blockNode)
 	for nRound := 0; nRound < minInt(64, len(vSortedByTimestamp)); nRound++ {
 		// add an interval section to the current selection round
 		nSelectionIntervalStop += getStakeModifierSelectionIntervalSection(b, nRound)
@@ -298,17 +298,17 @@ func (b *BlockChain) ComputeNextStakeModifier(pindexCurrent *btcutil.Block) (
 		pindex, errSelBlk := selectBlockFromCandidates(b, vSortedByTimestamp,
 			mapSelectedBlocks, nSelectionIntervalStop, nStakeModifier)
 		if errSelBlk != nil {
-			err = fmt.Errorf("ComputeNextStakeModifier: unable to select block at round %d : %v", nRound, errSelBlk)
+			err = fmt.Errorf("computeNextStakeModifier: unable to select block at round %d : %v", nRound, errSelBlk)
 			return
 		}
 		// write the entropy bit of the selected block
-		nStakeModifierNew |= (uint64(GetStakeEntropyBit(pindex.meta)) << uint64(nRound))
+		nStakeModifierNew |= (uint64(getMetaStakeEntropyBit(pindex.meta)) << uint64(nRound))
 		// add the selected block from candidates to selected list
 		mapSelectedBlocks[pindex.hash] = pindex
 		//if (fDebug && GetBoolArg("-printstakemodifier")) {
-		log.Debugf("ComputeNextStakeModifier: selected round %d stop=%s height=%d bit=%d modifier=%v",
+		log.Debugf("computeNextStakeModifier: selected round %d stop=%s height=%d bit=%d modifier=%v",
 			nRound, dateTimeStrFormat(nSelectionIntervalStop),
-			pindex.height, GetStakeEntropyBit(pindex.meta),
+			pindex.height, getMetaStakeEntropyBit(pindex.meta),
 			getStakeModifierHexString(nStakeModifierNew))
 		//}
 	}
@@ -342,10 +342,10 @@ func (b *BlockChain) ComputeNextStakeModifier(pindexCurrent *btcutil.Block) (
 			}
 			strSelectionMap.replace(item.Height() - nHeightFirstCandidate, 1,  blockType);
 		}
-		log.Debugf("ComputeNextStakeModifier: selection height [%d, %d] map %s\n", nHeightFirstCandidate, pindexPrev.Height(), strSelectionMap)
+		log.Debugf("computeNextStakeModifier: selection height [%d, %d] map %s\n", nHeightFirstCandidate, pindexPrev.Height(), strSelectionMap)
 	}*/
 
-	log.Debugf("ComputeNextStakeModifier: new modifier=%v time=%v height=%v",
+	log.Debugf("computeNextStakeModifier: new modifier=%v time=%v height=%v",
 		getStakeModifierHexString(nStakeModifierNew),
 		dateTimeStrFormat(pindexPrev.timestamp.Unix()), pindexCurrent.Height())
 
@@ -355,47 +355,93 @@ func (b *BlockChain) ComputeNextStakeModifier(pindexCurrent *btcutil.Block) (
 	return
 }
 
+
+// AddToBlockIndex processes all ppcoin specific block meta data
+func (b *BlockChain) AddToBlockIndex(block *btcutil.Block) (err error) {
+
+	defer timeTrack(now(), fmt.Sprintf("AddToBlockIndex(%v)", slice(block.Sha())[0]))
+
+	meta := block.Meta()
+
+	// ppcoin: compute stake entropy bit for stake modifier
+	stakeEntropyBit, err := getStakeEntropyBit(b, block)
+	if err != nil {
+		err = errors.New("AddToBlockIndex() : GetStakeEntropyBit() failed")
+		return
+	}
+	setMetaStakeEntropyBit(meta, stakeEntropyBit)
+
+	// ppcoin: compute stake modifier
+	nStakeModifier := uint64(0)
+	fGeneratedStakeModifier := false
+	nStakeModifier, fGeneratedStakeModifier, err =
+		b.computeNextStakeModifier(block)
+	if err != nil {
+		err = fmt.Errorf("AddToBlockIndex() : computeNextStakeModifier() failed %v", err)
+		return
+	}
+
+	meta.StakeModifier = nStakeModifier
+	setGeneratedStakeModifier(meta, fGeneratedStakeModifier)
+
+	meta.StakeModifierChecksum, err = b.getStakeModifierChecksum(block)
+
+	log.Debugf("AddToBlockIndex() : height=%d, modifier=%v, checksum=%v",
+		block.Height(), getStakeModifierHexString(meta.StakeModifier),
+		getStakeModifierCSHexString(meta.StakeModifierChecksum))
+
+	if err != nil {
+		err = errors.New("AddToBlockIndex() : getStakeModifierChecksum() failed")
+		return
+	}
+	if !b.checkStakeModifierCheckpoints(block.Height(), meta.StakeModifierChecksum) {
+		err = fmt.Errorf("AddToBlockIndex() : Rejected by stake modifier checkpoint height=%d, modifier=%d", block.Height(), meta.StakeModifier)
+		return
+	}
+
+	return nil
+}
+
 // The stake modifier used to hash for a stake kernel is chosen as the stake
 // modifier about a selection interval later than the coin generating the kernel
-func (b *BlockChain) GetKernelStakeModifier(
-	hashBlockFrom *btcwire.ShaHash, fPrintProofOfStake bool) (
+func (b *BlockChain) getKernelStakeModifier(
+	hashBlockFrom *btcwire.ShaHash, timeSource MedianTimeSource, fPrintProofOfStake bool) (
 	nStakeModifier uint64, nStakeModifierHeight int32, nStakeModifierTime int64,
 	err error) {
 
-	defer timeTrack(now(), fmt.Sprintf("GetKernelStakeModifier(%v)", hashBlockFrom))
+	defer timeTrack(now(), fmt.Sprintf("getKernelStakeModifier(%v)", hashBlockFrom))
 
-	//log.Debugf("GetKernelStakeModifier : blockFrom = %v", hashBlockFrom)
+	//log.Debugf("getKernelStakeModifier : blockFrom = %v", hashBlockFrom)
 
 	nStakeModifier = 0
 	blockFrom, metaFrom, fetchErr := b.db.FetchBlockHeaderBySha(hashBlockFrom)
 	if fetchErr != nil {
-		err = fmt.Errorf("GetKernelStakeModifier() : block not found (%v)", fetchErr)
+		err = fmt.Errorf("getKernelStakeModifier() : block not found (%v)", fetchErr)
 		return
 	}
 	blockFromHeight, fetchErr := b.db.FetchBlockHeightBySha(hashBlockFrom)
 	if fetchErr != nil {
-		err = fmt.Errorf("GetKernelStakeModifier() : block height not found (%v)", fetchErr)
+		err = fmt.Errorf("getKernelStakeModifier() : block height not found (%v)", fetchErr)
 		return
 	}
 	nStakeModifierHeight = int32(blockFromHeight)
 	blockFromTimestamp := blockFrom.Timestamp.Unix()
 	nStakeModifierTime = blockFromTimestamp
-	var nStakeModifierSelectionInterval int64 = getStakeModifierSelectionInterval(b)
-	var block *btcwire.BlockHeader = blockFrom
-	var blockHeight int64 = blockFromHeight
-	var meta *btcwire.Meta = metaFrom
+	nStakeModifierSelectionInterval := getStakeModifierSelectionInterval(b)
+	block := blockFrom
+	blockHeight := blockFromHeight
+	meta := metaFrom
 	var blockSha *btcwire.ShaHash
 	// loop to find the stake modifier later by a selection interval
 	for nStakeModifierTime < (blockFromTimestamp + nStakeModifierSelectionInterval) {
 		if blockHeight >= b.bestChain.height { // reached best block; may happen if node is behind on block chain
 			blockTimestamp := block.Timestamp.Unix()
-			if fPrintProofOfStake || (blockTimestamp+b.netParams.StakeMinAge-nStakeModifierSelectionInterval > getAdjustedTime()) {
-				err = fmt.Errorf("GetKernelStakeModifier() : reached best block %v at height %v from block %v",
+			if fPrintProofOfStake || (blockTimestamp+b.netParams.StakeMinAge-nStakeModifierSelectionInterval > timeSource.AdjustedTime().Unix()) {
+				err = fmt.Errorf("getKernelStakeModifier() : reached best block %v at height %v from block %v",
 					btcutil.Slice(blockSha)[0], blockHeight, hashBlockFrom)
 				return
-			} else {
-				return
 			}
+			return
 		}
 		blockSha, err = b.db.FetchBlockShaByHeight(blockHeight + 1)
 		if err != nil {
@@ -405,8 +451,8 @@ func (b *BlockChain) GetKernelStakeModifier(
 		if err != nil {
 			return
 		}
-		blockHeight += 1
-		if IsGeneratedStakeModifier(meta) {
+		blockHeight++
+		if isGeneratedStakeModifier(meta) {
 			nStakeModifierHeight = int32(blockHeight)
 			nStakeModifierTime = block.Timestamp.Unix()
 		}
@@ -438,31 +484,31 @@ func (b *BlockChain) GetKernelStakeModifier(
 //   quantities so as to generate blocks faster, degrading the system back into
 //   a proof-of-work situation.
 //
-func (b *BlockChain) CheckStakeKernelHash(
+func (b *BlockChain) checkStakeKernelHash(
 	nBits uint32, blockFrom *btcutil.Block, nTxPrevOffset uint32,
 	txPrev *btcutil.Tx, prevout *btcwire.OutPoint, nTimeTx int64,
 	fPrintProofOfStake bool) (
 	hashProofOfStake *btcwire.ShaHash, success bool, err error) {
 
-	defer timeTrack(now(), fmt.Sprintf("CheckStakeKernelHash(%v)", slice(blockFrom.Sha())[0]))
+	defer timeTrack(now(), fmt.Sprintf("checkStakeKernelHash(%v)", slice(blockFrom.Sha())[0]))
 
 	success = false
 
 	txMsgPrev := txPrev.MsgTx()
 	if nTimeTx < txMsgPrev.Time.Unix() { // Transaction timestamp violation
-		err = errors.New("CheckStakeKernelHash() : nTime violation")
+		err = errors.New("checkStakeKernelHash() : nTime violation")
 		return
 	}
 
-	var nTimeBlockFrom int64 = blockFrom.MsgBlock().Header.Timestamp.Unix()
+	nTimeBlockFrom := blockFrom.MsgBlock().Header.Timestamp.Unix()
 	if nTimeBlockFrom+b.netParams.StakeMinAge > nTimeTx { // Min age requirement
-		err = errors.New("CheckStakeKernelHash() : min age violation")
+		err = errors.New("checkStakeKernelHash() : min age violation")
 		return
 	}
 
 	bnTargetPerCoinDay := CompactToBig(nBits)
 
-	var nValueIn int64 = txMsgPrev.TxOut[prevout.Index].Value
+	nValueIn := txMsgPrev.TxOut[prevout.Index].Value
 
 	// v0.3 protocol kernel hash weight starts from 0 at the 30-day min age
 	// this change increases active coins participating the hash and helps
@@ -473,16 +519,16 @@ func (b *BlockChain) CheckStakeKernelHash(
 	} else {
 		timeReduction = 0
 	}
-	var nTimeWeight int64 = minInt64(nTimeTx-txMsgPrev.Time.Unix(), StakeMaxAge) - timeReduction
+	nTimeWeight := minInt64(nTimeTx-txMsgPrev.Time.Unix(), StakeMaxAge) - timeReduction
 
 	//CBigNum bnCoinDayWeight = CBigNum(nValueIn) * nTimeWeight / COIN / (24 * 60 * 60)
-	var bnCoinDayWeight *big.Int = new(big.Int).Div(new(big.Int).Div(new(big.Int).Mul(
-		big.NewInt(nValueIn), big.NewInt(nTimeWeight)), big.NewInt(COIN)), big.NewInt(24*60*60))
+	bnCoinDayWeight := new(big.Int).Div(new(big.Int).Div(new(big.Int).Mul(
+		big.NewInt(nValueIn), big.NewInt(nTimeWeight)), big.NewInt(Coin)), big.NewInt(24*60*60))
 	/*var bnCoinDayWeight *big.Int = new(big.Int).Div(new(big.Int).Mul(
 	new(big.Int).Div(big.NewtInt(nValueIn), big.NewInt(COIN)),
 		big.NewInt(nTimeWeight)), big.NewInt(24*60*60))*/
 
-	log.Debugf("CheckStakeKernelHash() : nValueIn=%v nTimeWeight=%v bnCoinDayWeight=%v",
+	log.Debugf("checkStakeKernelHash() : nValueIn=%v nTimeWeight=%v bnCoinDayWeight=%v",
 		nValueIn, nTimeWeight, bnCoinDayWeight)
 
 	// Calculate hash
@@ -499,7 +545,7 @@ func (b *BlockChain) CheckStakeKernelHash(
 			return
 		}
 		nStakeModifier, nStakeModifierHeight, nStakeModifierTime, err =
-			b.GetKernelStakeModifier(blockFromSha, fPrintProofOfStake)
+			b.getKernelStakeModifier(blockFromSha, timeSource, fPrintProofOfStake)
 		if err != nil {
 			return
 		}
@@ -554,7 +600,7 @@ func (b *BlockChain) CheckStakeKernelHash(
 
 	if fPrintProofOfStake {
 		if isProtocolV03(b, nTimeTx) {
-			log.Debugf("CheckStakeKernelHash() : using modifier %d at height=%d timestamp=%s for block from height=%d timestamp=%s",
+			log.Debugf("checkStakeKernelHash() : using modifier %d at height=%d timestamp=%s for block from height=%d timestamp=%s",
 				nStakeModifier, nStakeModifierHeight,
 				dateTimeStrFormat(nStakeModifierTime), blockFrom.Height(),
 				dateTimeStrFormat(nTimeBlockFrom))
@@ -568,7 +614,7 @@ func (b *BlockChain) CheckStakeKernelHash(
 			ver = "0.2"
 			modifier = uint64(nBits)
 		}
-		log.Debugf("CheckStakeKernelHash() : check protocol=%s modifier=%d nBits=%d nTimeBlockFrom=%d nTxPrevOffset=%d nTimeTxPrev=%d nPrevout=%d nTimeTx=%d hashProof=%s",
+		log.Debugf("checkStakeKernelHash() : check protocol=%s modifier=%d nBits=%d nTimeBlockFrom=%d nTxPrevOffset=%d nTimeTxPrev=%d nPrevout=%d nTimeTx=%d hashProof=%s",
 			ver, modifier, nBits, nTimeBlockFrom, nTxPrevOffset, txMsgPrev.Time.Unix(),
 			prevout.Index, nTimeTx, hashProofOfStake.String())
 	}
@@ -576,7 +622,7 @@ func (b *BlockChain) CheckStakeKernelHash(
 	// Now check if proof-of-stake hash meets target protocol
 	hashProofOfStakeInt := ShaHashToBig(hashProofOfStake)
 	targetInt := new(big.Int).Mul(bnCoinDayWeight, bnTargetPerCoinDay)
-	//log.Debugf("CheckStakeKernelHash() : hashInt = %v, targetInt = %v", hashProofOfStakeInt, targetInt)
+	//log.Debugf("checkStakeKernelHash() : hashInt = %v, targetInt = %v", hashProofOfStakeInt, targetInt)
 	if hashProofOfStakeInt.Cmp(targetInt) > 0 {
 		return
 	}
@@ -584,7 +630,7 @@ func (b *BlockChain) CheckStakeKernelHash(
 	//if (fDebug && !fPrintProofOfStake) {
 	if !fPrintProofOfStake {
 		if isProtocolV03(b, nTimeTx) {
-			log.Debugf("CheckStakeKernelHash() : using modifier %d at height=%d timestamp=%s for block from height=%d timestamp=%s\n",
+			log.Debugf("checkStakeKernelHash() : using modifier %d at height=%d timestamp=%s for block from height=%d timestamp=%s\n",
 				nStakeModifier, nStakeModifierHeight,
 				dateTimeStrFormat(nStakeModifierTime), blockFrom.Height(),
 				dateTimeStrFormat(nTimeBlockFrom))
@@ -598,7 +644,7 @@ func (b *BlockChain) CheckStakeKernelHash(
 			ver = "0.2"
 			modifier = uint64(nBits)
 		}
-		log.Debugf("CheckStakeKernelHash() : pass protocol=%s modifier=%d nTimeBlockFrom=%d nTxPrevOffset=%d nTimeTxPrev=%d nPrevout=%d nTimeTx=%d hashProof=%s",
+		log.Debugf("checkStakeKernelHash() : pass protocol=%s modifier=%d nTimeBlockFrom=%d nTxPrevOffset=%d nTimeTxPrev=%d nPrevout=%d nTimeTx=%d hashProof=%s",
 			ver, modifier, nTimeBlockFrom, nTxPrevOffset, txMsgPrev.Time.Unix(),
 			prevout.Index, nTimeTx, hashProofOfStake.String())
 	}
@@ -621,7 +667,7 @@ func (b *BlockChain) checkTxProofOfStake(tx *btcutil.Tx, nBits uint32) (
 	}
 
 	// Kernel (input 0) must match the stake hash target per coin age (nBits)
-	var txin *btcwire.TxIn = msgTx.TxIn[0]
+	txin := msgTx.TxIn[0]
 
 	// First try finding the previous transaction in database
 	txStore, err := b.FetchTransactionStore(tx)
@@ -665,8 +711,8 @@ func (b *BlockChain) checkTxProofOfStake(tx *btcutil.Tx, nBits uint32) (
 			fDebug := true
 			//nTxPrevOffset uint := txindex.pos.nTxPos - txindex.pos.nBlockPos
 			prevBlockTxLoc, _ := prevBlock.TxLoc() // TODO not optimal way
-			var nTxPrevOffset uint32 = uint32(prevBlockTxLoc[txPrev.Index()].TxStart)
-			hashProofOfStake, success, err = b.CheckStakeKernelHash(
+			nTxPrevOffset := uint32(prevBlockTxLoc[txPrev.Index()].TxStart)
+			hashProofOfStake, success, err = b.checkStakeKernelHash(
 				nBits, prevBlock, nTxPrevOffset, txPrev, &txin.PreviousOutPoint,
 				msgTx.Time.Unix(), fDebug)
 			if err != nil {
@@ -702,13 +748,12 @@ func (b *BlockChain) checkBlockProofOfStake(block *btcutil.Block) error {
 		hashProofOfStake, err :=
 			b.checkTxProofOfStake(tx, block.MsgBlock().Header.Bits)
 		if err != nil {
-			str := fmt.Sprintf("Proof of stake check failed for block %v : %v", blockHash, err)
-			return ruleError(ErrProofOfStakeCheck, str)
-		} else {
-			SetProofOfStake(block.Meta(), true) // Important: flags
-			block.Meta().HashProofOfStake = *hashProofOfStake
-			log.Debugf("Proof of stake for block %v = %v", blockHash, hashProofOfStake)
+			return err
 		}
+
+		setProofOfStake(block.Meta(), true) // Important: flags
+		block.Meta().HashProofOfStake = *hashProofOfStake
+		log.Debugf("Proof of stake for block %v = %v", blockHash, hashProofOfStake)
 
 	}
 
@@ -717,32 +762,32 @@ func (b *BlockChain) checkBlockProofOfStake(block *btcutil.Block) error {
 
 // Check whether the coinstake timestamp meets protocol
 // called from main.cpp
-func (b *BlockChain) CheckCoinStakeTimestamp(
+func (b *BlockChain) checkCoinStakeTimestamp(
 	nTimeBlock int64, nTimeTx int64) bool {
 
 	if isProtocolV03(b, nTimeTx) { // v0.3 protocol
 		return (nTimeBlock == nTimeTx)
-	} else { // v0.2 protocol
-		return ((nTimeTx <= nTimeBlock) && (nTimeBlock <= nTimeTx+MaxClockDrift))
 	}
+	// v0.2 protocol
+	return ((nTimeTx <= nTimeBlock) && (nTimeBlock <= nTimeTx+MaxClockDrift))
 }
 
-func CheckCoinStakeTimestamp(params *btcnet.Params,
+func checkCoinStakeTimestamp(params *btcnet.Params,
 	nTimeBlock int64, nTimeTx int64) bool {
 
 	if isProtocolV03FromParams(params, nTimeTx) { // v0.3 protocol
 		return (nTimeBlock == nTimeTx)
-	} else { // v0.2 protocol
-		return ((nTimeTx <= nTimeBlock) && (nTimeBlock <= nTimeTx+MaxClockDrift))
 	}
+	// v0.2 protocol
+	return ((nTimeTx <= nTimeBlock) && (nTimeBlock <= nTimeTx+MaxClockDrift))
 }
 
 // Get stake modifier checksum
 // called from main.cpp
-func (b *BlockChain) GetStakeModifierChecksum(
+func (b *BlockChain) getStakeModifierChecksum(
 	pindex *btcutil.Block) (checkSum uint32, err error) {
 
-	defer timeTrack(now(), fmt.Sprintf("GetStakeModifierChecksum(%v)", slice(pindex.Sha())[0]))
+	defer timeTrack(now(), fmt.Sprintf("getStakeModifierChecksum(%v)", slice(pindex.Sha())[0]))
 
 	//assert (pindex.pprev || pindex.Sha().IsEqual(hashGenesisBlock))
 	// Hash previous checksum with flags, hashProofOfStake and nStakeModifier
@@ -798,7 +843,7 @@ func (b *BlockChain) GetStakeModifierChecksum(
 
 // Check stake modifier hard checkpoints
 // called from (main.cpp)
-func (b *BlockChain) CheckStakeModifierCheckpoints(
+func (b *BlockChain) checkStakeModifierCheckpoints(
 	nHeight int64, nStakeModifierChecksum uint32) bool {
 	if b.netParams.Name == "testnet3" {
 		return true // Testnet has no checkpoints

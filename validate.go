@@ -927,7 +927,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block) er
 		}
 	}
 
-	if !node.IsProofOfStake() {
+	if !node.isProofOfStake() {
 		// The total output values of the coinbase transaction must not exceed
 		// the expected subsidy value.  It is safe to ignore overflow and out of range
 		// errors here because those error conditions would have already been
