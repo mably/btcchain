@@ -16,19 +16,37 @@ import (
 
 // Peercoin
 const (
+	// InitialHashTargetBits TODO(?) golint
 	InitialHashTargetBits uint32 = 0x1c00ffff
+	// TargetSpacingWorkMax TODO(?) golint
 	TargetSpacingWorkMax  int64  = StakeTargetSpacing * 12
+	// TargetTimespan TODO(?) golint
 	TargetTimespan        int64  = 7 * 24 * 60 * 60
 
+	// Cent is the number of sunnys in one cent of peercoin
 	Cent               int64 = 10000
+	// Coin is the number of sunnys in one peercoin
 	Coin               int64 = 100 * Cent
+	// MinTxFee is the minimum transaction fee
 	MinTxFee           int64 = Cent
+	// MinRelayTxFee is the minimum relayed transaction fee
 	MinRelayTxFee      int64 = Cent
+	// MaxMoney is the max number of sunnys that can be generated
 	MaxMoney           int64 = 2000000000 * Coin
+	// MaxMintProofOfWork is the max number of sunnys that can be POW minted
 	MaxMintProofOfWork int64 = 9999 * Coin
+	// MinTxOutAmount is the minimum output amount required for a transaction
 	MinTxOutAmount     int64 = MinTxFee
+
+	// FBlockProofOfStake proof of stake blockNode flag (ppc)
+	FBlockProofOfStake  = uint32(1 << 0)
+	// FBlockStakeEntropy entropy bit for stake modifier blockNode flag (ppc)
+	FBlockStakeEntropy  = uint32(1 << 1)
+	// FBlockStakeModifier regenerated stake modifier blockNode flag (ppc)
+	FBlockStakeModifier = uint32(1 << 2)
 )
 
+// Stake TODO(?) golint
 type Stake struct {
 	outPoint btcwire.OutPoint
 	time     int64
@@ -40,16 +58,14 @@ const (
 	phasePreSanity processPhase = iota
 )
 
-func GetProofOfStakeFromBlock(block *btcutil.Block) Stake {
+func getProofOfStakeFromBlock(block *btcutil.Block) Stake {
 	if block.IsProofOfStake() {
 		tx := block.Transactions()[1].MsgTx()
 		return Stake{tx.TxIn[0].PreviousOutPoint, tx.Time.Unix()}
-	} else {
-		return Stake{}
 	}
+	return Stake{}
 }
 
-var ZeroSha = btcwire.ShaHash{}
 var stakeSeen, stakeSeenOrphan = make(map[Stake]bool), make(map[Stake]bool)
 
 // getBlockNode try to obtain a node form the memory block chain and loads it
@@ -72,7 +88,7 @@ func (b *BlockChain) getBlockNode(hash *btcwire.ShaHash) (*blockNode, error) {
 
 // https://github.com/ppcoin/ppcoin/blob/v0.4.0ppc/src/main.cpp#L894
 // ppcoin: find last block index up to pindex
-func (b *BlockChain) GetLastBlockIndex(last *blockNode, proofOfStake bool) (block *blockNode) {
+func (b *BlockChain) getLastBlockIndex(last *blockNode, proofOfStake bool) (block *blockNode) {
 
 	if last == nil {
 		defer timeTrack(now(), fmt.Sprintf("GetLastBlockIndex"))
@@ -114,12 +130,12 @@ func (b *BlockChain) ppcCalcNextRequiredDifficulty(lastNode *blockNode, proofOfS
 
 	defer timeTrack(now(), fmt.Sprintf("ppcCalcNextRequiredDifficulty(%v)", lastNode.hash))
 
-	prev := b.GetLastBlockIndex(lastNode, proofOfStake)
+	prev := b.getLastBlockIndex(lastNode, proofOfStake)
 	if prev.hash.IsEqual(b.netParams.GenesisHash) {
 		return b.netParams.InitialHashTargetBits, nil // first block
 	}
 	prevParent, _ := b.getPrevNodeFromNode(prev)
-	prevPrev := b.GetLastBlockIndex(prevParent, proofOfStake)
+	prevPrev := b.getLastBlockIndex(prevParent, proofOfStake)
 	if prevPrev.hash.IsEqual(b.netParams.GenesisHash) {
 		return b.netParams.InitialHashTargetBits, nil // second block
 	}
@@ -154,9 +170,9 @@ func (b *BlockChain) ppcCalcNextRequiredDifficulty(lastNode *blockNode, proofOfS
 // rules.
 //
 // This function is NOT safe for concurrent access.
-func (b *BlockChain) PPCCalcNextRequiredDifficulty(proofOfStake bool) (uint32, error) {
+/*func (b *BlockChain) PPCCalcNextRequiredDifficulty(proofOfStake bool) (uint32, error) {
 	return b.ppcCalcNextRequiredDifficulty(b.bestChain, proofOfStake)
-}
+}*/
 
 // SetCoinbaseMaturity sets required coinbase maturity and return old one
 // Required for tests
@@ -192,6 +208,7 @@ func CalcTrust(bits uint32, proofOfStake bool) *big.Int {
 	return new(big.Int).Div(oneLsh256, denominator)
 }
 
+// CalcMintAndMoneySupply TODO(?) golint
 func (b *BlockChain) CalcMintAndMoneySupply(node *blockNode, block *btcutil.Block) error {
 
 	var nFees int64 = 0
@@ -257,7 +274,7 @@ func (b *BlockChain) CalcMintAndMoneySupply(node *blockNode, block *btcutil.Bloc
 // guaranteed to be in main chain by sync-checkpoint. This rule is
 // introduced to help nodes establish a consistent view of the coin
 // age (trust score) of competing branches.
-func (b *BlockChain) GetCoinAgeTx(tx *btcutil.Tx, txStore TxStore) (uint64, error) {
+func (b *BlockChain) getCoinAgeTx(tx *btcutil.Tx, txStore TxStore) (uint64, error) {
 
 	var bnCentSecond *big.Int = big.NewInt(0) // coin age in the unit of cent-seconds
 
@@ -325,7 +342,7 @@ func (b *BlockChain) GetCoinAgeBlock(node *blockNode, block *btcutil.Block) (uin
 
 	transactions := block.Transactions()
 	for _, tx := range transactions {
-		nTxCoinAge, err := b.GetCoinAgeTx(tx, txStore)
+		nTxCoinAge, err := b.getCoinAgeTx(tx, txStore)
 		if err != nil {
 			return 0, err
 		}
@@ -574,7 +591,7 @@ func ppcCheckTransactionInputs(tx *btcutil.Tx, txStore TxStore, blockChain *Bloc
 	// 	return DoS(100, error("ConnectInputs() : %s stake reward exceeded", GetHash().ToString().substr(0,10).c_str()));
 	// }
 	if IsCoinStake(tx) {
-		coinAge, err := blockChain.GetCoinAgeTx(tx, txStore)
+		coinAge, err := blockChain.getCoinAgeTx(tx, txStore)
 		if err != nil {
 			return fmt.Errorf("unable to get coin age for coinstake: %v", err)
 		}
@@ -674,7 +691,7 @@ func (b *BlockChain) ppcProcessOrphan(block *btcutil.Block) error {
 		if err != nil {
 			return err
 		}
-		stake := GetProofOfStakeFromBlock(block)
+		stake := getProofOfStakeFromBlock(block)
 		_, seen := stakeSeen[stake]
 		childs, hasChild := b.prevOrphans[*sha]
 		hasChild = hasChild && (len(childs) > 0)
@@ -693,7 +710,7 @@ func (b *BlockChain) ppcProcessOrphan(block *btcutil.Block) error {
 
 func (b *BlockChain) ppcOrphanBlockRemoved(block *btcutil.Block) {
 	// https://github.com/ppcoin/ppcoin/blob/v0.4.0ppc/src/main.cpp#L2078
-	delete(stakeSeenOrphan, GetProofOfStakeFromBlock(block))
+	delete(stakeSeenOrphan, getProofOfStakeFromBlock(block))
 }
 
 func (b *BlockChain) ppcProcessBlock(block *btcutil.Block, phase processPhase) error {
@@ -709,7 +726,7 @@ func (b *BlockChain) ppcProcessBlock(block *btcutil.Block, phase processPhase) e
 			if err != nil {
 				return err
 			}
-			stake := GetProofOfStakeFromBlock(block)
+			stake := getProofOfStakeFromBlock(block)
 			_, seen := stakeSeen[stake]
 			childs, hasChild := b.prevOrphans[*sha]
 			hasChild = hasChild && (len(childs) > 0)

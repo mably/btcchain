@@ -21,9 +21,11 @@ import (
 
 const (
 	nModifierIntervalRatio int64 = 3
+	// StakeTargetSpacing TODO(kac-) golint
 	StakeTargetSpacing     int64 = 10 * 60           // 10 minutes
+	// StakeMaxAge TODO(kac-) golint
 	StakeMaxAge            int64 = 60 * 60 * 24 * 90 // stake age of full weight
-	COIN                   int64 = 1000000           // util.h
+	// MaxClockDrift TODO(kac-) golint
 	MaxClockDrift          int64 = 2 * 60 * 60       // two hours (main.h)
 )
 
@@ -33,6 +35,8 @@ type blockTimeHash struct {
 }
 
 type blockTimeHashSorter []blockTimeHash
+
+var zeroSha = btcwire.ShaHash{}
 
 // Len returns the number of timestamps in the slice.  It is part of the
 // sort.Interface implementation.
@@ -145,7 +149,7 @@ func selectBlockFromCandidates(
 		// compute the selection hash by hashing its proof-hash and the
 		// previous proof-of-stake modifier
 		var hashProof btcwire.ShaHash
-		if !pindex.meta.HashProofOfStake.IsEqual(&ZeroSha) { // TODO test null pointer in original code
+		if !pindex.meta.HashProofOfStake.IsEqual(&zeroSha) { // TODO(mably) test null pointer in original code
 			hashProof = pindex.meta.HashProofOfStake
 		} else {
 			hashProof = *pindex.hash
@@ -168,7 +172,7 @@ func selectBlockFromCandidates(
 		// the selection hash is divided by 2**32 so that proof-of-stake block
 		// is always favored over proof-of-work block. this is to preserve
 		// the energy efficiency property
-		if !pindex.meta.HashProofOfStake.IsEqual(&ZeroSha) { // TODO test null pointer in original code
+		if !pindex.meta.HashProofOfStake.IsEqual(&zeroSha) { // TODO(mably) test null pointer in original code
 			tmp := ShaHashToBig(hashSelection)
 			//hashSelection >>= 32
 			tmp = tmp.Rsh(tmp, 32)
