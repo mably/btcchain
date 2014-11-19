@@ -402,6 +402,7 @@ func (b *BlockChain) AddToBlockIndex(block *btcutil.Block) (err error) {
 	return nil
 }
 
+// GetKernelStakeModifier calculates stake modifier.
 // The stake modifier used to hash for a stake kernel is chosen as the stake
 // modifier about a selection interval later than the coin generating the kernel
 func (b *BlockChain) GetKernelStakeModifier(
