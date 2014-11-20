@@ -432,7 +432,7 @@ func (b *BlockChain) loadBlockNode(hash *btcwire.ShaHash) (*blockNode, error) {
 	//     to the tree, so it's the root.
 	prevHash := &blockHeader.PrevBlock
 	parentNode, ok := b.index[*prevHash]
-	log.Debugf("height = %d, prevHash = %v, parentNode = %v, ok = %v", blockHeight, prevHash, parentNode, ok)
+	//log.Debugf("height = %d, prevHash = %v, parentNode = %v, ok = %v", blockHeight, prevHash, parentNode, ok)
 	if ok {
 		// Case 1 -- This node is a child of an existing block node.
 		// Update the node's work sum with the sum of the parent node's
@@ -769,7 +769,7 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block) error {
 	block.Meta().ChainTrust = *node.workSum
 	//log.Debugf("Block %v trust = %v", node.height, node.workSum)
 
-	// ppcoin: calculate block mint and money supply
+	// ppc: calculate block mint and money supply
 	err := b.CalcMintAndMoneySupply(node, block)
 	if err != nil {
 		return err

@@ -102,7 +102,7 @@ func (b *BlockChain) getLastBlockIndex(last *blockNode, proofOfStake bool) (bloc
 		if block == nil {
 			break
 		}
-		// TODO dirty workaround, ppcoin doesn't point to genesis block
+		// TODO(mably) dirty workaround, ppcoin doesn't point to genesis block
 		if block.height == 0 {
 			break
 		}

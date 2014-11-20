@@ -12,6 +12,7 @@ import (
 	"io"
 	"math/big"
 	"sort"
+	"time"
 
 	"github.com/mably/btcscript"
 	"github.com/mably/btcutil"
@@ -115,6 +116,7 @@ func getStakeModifierSelectionInterval(b *BlockChain) int64 {
 	for nSection := 0; nSection < 64; nSection++ {
 		nSelectionInterval += getStakeModifierSelectionIntervalSection(b, nSection)
 	}
+	log.Debugf("nSelectionInterval = %v (%vs)", time.Duration(nSelectionInterval)*time.Second, nSelectionInterval)
 	return nSelectionInterval
 }
 
@@ -281,7 +283,7 @@ func (b *BlockChain) computeNextStakeModifier(pindexCurrent *btcutil.Block) (
 			blockTimeHash{pindex.timestamp.Unix(), pindex.hash})
 		pindex, err = b.getPrevNodeFromNode(pindex)
 	}
-	// TODO needs verification
+	// TODO(mably) needs verification
 	//reverse(vSortedByTimestamp.begin(), vSortedByTimestamp.end());
 	//sort(vSortedByTimestamp.begin(), vSortedByTimestamp.end());
 	sort.Reverse(blockTimeHashSorter(vSortedByTimestamp))
@@ -363,7 +365,7 @@ func (b *BlockChain) AddToBlockIndex(block *btcutil.Block) (err error) {
 
 	meta := block.Meta()
 
-	// ppcoin: compute stake entropy bit for stake modifier
+	// ppc: compute stake entropy bit for stake modifier
 	stakeEntropyBit, err := getStakeEntropyBit(b, block)
 	if err != nil {
 		err = errors.New("AddToBlockIndex() : GetStakeEntropyBit() failed")
@@ -371,7 +373,7 @@ func (b *BlockChain) AddToBlockIndex(block *btcutil.Block) (err error) {
 	}
 	setMetaStakeEntropyBit(meta, stakeEntropyBit)
 
-	// ppcoin: compute stake modifier
+	// ppc: compute stake modifier
 	nStakeModifier := uint64(0)
 	fGeneratedStakeModifier := false
 	nStakeModifier, fGeneratedStakeModifier, err =
@@ -437,7 +439,7 @@ func (b *BlockChain) getKernelStakeModifier(
 		if blockHeight >= b.bestChain.height { // reached best block; may happen if node is behind on block chain
 			blockTimestamp := block.Timestamp.Unix()
 			if fPrintProofOfStake || (blockTimestamp+b.netParams.StakeMinAge-nStakeModifierSelectionInterval > timeSource.AdjustedTime().Unix()) {
-				err = fmt.Errorf("GetKernelStakeModifier() : reached best block %v at height %v from block %v",
+				err = fmt.Errorf("getKernelStakeModifier() : reached best block %v at height %v from block %v",
 					btcutil.Slice(blockSha)[0], blockHeight, hashBlockFrom)
 				return
 			}
@@ -532,7 +534,7 @@ func (b *BlockChain) checkStakeKernelHash(
 		nValueIn, nTimeWeight, bnCoinDayWeight)
 
 	// Calculate hash
-	buf := bytes.NewBuffer(make([]byte, 0, 28)) // TODO pre-calculate size?
+	buf := bytes.NewBuffer(make([]byte, 0, 28)) // TODO(mably) pre-calculate size?
 
 	bufSize := 0
 	var nStakeModifier uint64
@@ -792,7 +794,7 @@ func (b *BlockChain) getStakeModifierChecksum(
 	//assert (pindex.pprev || pindex.Sha().IsEqual(hashGenesisBlock))
 	// Hash previous checksum with flags, hashProofOfStake and nStakeModifier
 	bufSize := 0
-	buf := bytes.NewBuffer(make([]byte, 0, 50)) // TODO calculate size
+	buf := bytes.NewBuffer(make([]byte, 0, 50)) // TODO(mably) calculate size
 	//CDataStream ss(SER_GETHASH, 0)
 	var parent *blockNode
 	parent, err = b.getPrevNodeFromBlock(pindex)

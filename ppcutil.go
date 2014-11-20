@@ -34,7 +34,7 @@ func getBlockTrust(block *btcutil.Block) *big.Int {
 	return CalcTrust(block.MsgBlock().Header.Bits, block.MsgBlock().IsProofOfStake())
 }
 
-// ppcoin: entropy bit for stake modifier if chosen by modifier
+// ppc: entropy bit for stake modifier if chosen by modifier
 func getStakeEntropyBit(b *BlockChain, block *btcutil.Block) (uint32, error) {
 
 	defer timeTrack(now(), fmt.Sprintf("getStakeEntropyBit(%v)", slice(block.Sha())[0]))
