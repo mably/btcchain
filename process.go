@@ -161,13 +161,6 @@ func (b *BlockChain) ProcessBlock(block *btcutil.Block, timeSource MedianTimeSou
 		return false, err
 	}
 
-	// ppcoin: verify hash target and signature of coinstake tx
-	// TODO is it the best place to do that?
-	err = b.checkBlockProofOfStake(block, timeSource)
-	if err != nil {
-		return false, err
-	}
-
 	// Find the previous checkpoint and perform some additional checks based
 	// on the checkpoint.  This provides a few nice properties such as
 	// preventing old side chain blocks before the last checkpoint,
