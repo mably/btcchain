@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/mably/btcutil"
+	"github.com/mably/btcwire"
 )
 
 // maybeAcceptBlock potentially accepts a block into the memory block chain.
@@ -109,7 +110,7 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, timeSource MedianTim
 		return ruleError(ErrForkTooOld, str)
 	}
 
-	if !fastAdd {
+	if !fastAdd && b.netParams.Net != btcwire.TestNet3 {
 		// Reject version 1 blocks once a majority of the network has
 		// upgraded.  This is part of BIP0034.
 		if blockHeader.Version < 2 {
