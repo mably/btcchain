@@ -6,13 +6,14 @@ package btcchain
 
 import (
 	"fmt"
+	"math/big"
+
 	"github.com/conformal/btcec"
 	"github.com/mably/btcdb"
 	"github.com/mably/btcnet"
 	"github.com/mably/btcscript"
 	"github.com/mably/btcutil"
 	"github.com/mably/btcwire"
-	"math/big"
 )
 
 // Peercoin
@@ -20,38 +21,32 @@ const (
 	// InitialHashTargetBits TODO(?) golint
 	InitialHashTargetBits uint32 = 0x1c00ffff
 	// TargetSpacingWorkMax TODO(?) golint
-	TargetSpacingWorkMax  int64  = StakeTargetSpacing * 12
+	TargetSpacingWorkMax int64 = StakeTargetSpacing * 12
 	// TargetTimespan TODO(?) golint
-	TargetTimespan        int64  = 7 * 24 * 60 * 60
+	TargetTimespan int64 = 7 * 24 * 60 * 60
 
 	// Cent is the number of sunnys in one cent of peercoin
-	Cent               int64 = 10000
+	Cent int64 = 10000
 	// Coin is the number of sunnys in one peercoin
-	Coin               int64 = 100 * Cent
+	Coin int64 = 100 * Cent
 	// MinTxFee is the minimum transaction fee
-	MinTxFee           int64 = Cent
+	MinTxFee int64 = Cent
 	// MinRelayTxFee is the minimum relayed transaction fee
-	MinRelayTxFee      int64 = Cent
+	MinRelayTxFee int64 = Cent
 	// MaxMoney is the max number of sunnys that can be generated
-	MaxMoney           int64 = 2000000000 * Coin
+	MaxMoney int64 = 2000000000 * Coin
 	// MaxMintProofOfWork is the max number of sunnys that can be POW minted
 	MaxMintProofOfWork int64 = 9999 * Coin
 	// MinTxOutAmount is the minimum output amount required for a transaction
-	MinTxOutAmount     int64 = MinTxFee
+	MinTxOutAmount int64 = MinTxFee
 
 	// FBlockProofOfStake proof of stake blockNode flag (ppc)
-	FBlockProofOfStake  = uint32(1 << 0)
+	FBlockProofOfStake = uint32(1 << 0)
 	// FBlockStakeEntropy entropy bit for stake modifier blockNode flag (ppc)
-	FBlockStakeEntropy  = uint32(1 << 1)
+	FBlockStakeEntropy = uint32(1 << 1)
 	// FBlockStakeModifier regenerated stake modifier blockNode flag (ppc)
 	FBlockStakeModifier = uint32(1 << 2)
 )
-
-// Stake TODO(?) golint
-type Stake struct {
-	outPoint btcwire.OutPoint
-	time     int64
-}
 
 type processPhase int
 
@@ -59,15 +54,15 @@ const (
 	phasePreSanity processPhase = iota
 )
 
-func getProofOfStakeFromBlock(block *btcutil.Block) Stake {
+func getProofOfStakeFromBlock(block *btcutil.Block) btcwire.Stake {
 	if block.IsProofOfStake() {
 		tx := block.Transactions()[1].MsgTx()
-		return Stake{tx.TxIn[0].PreviousOutPoint, tx.Time.Unix()}
+		return btcwire.Stake{tx.TxIn[0].PreviousOutPoint, tx.Time.Unix()}
 	}
-	return Stake{}
+	return btcwire.Stake{}
 }
 
-var stakeSeen, stakeSeenOrphan = make(map[Stake]bool), make(map[Stake]bool)
+var stakeSeen, stakeSeenOrphan = make(map[btcwire.Stake]bool), make(map[btcwire.Stake]bool)
 
 // getBlockNode try to obtain a node form the memory block chain and loads it
 // form the database in not found in memory.
@@ -718,6 +713,48 @@ func (b *BlockChain) ppcOrphanBlockRemoved(block *btcutil.Block) {
 	delete(stakeSeenOrphan, getProofOfStakeFromBlock(block))
 }
 
+// PPCGetOrphanRoot
+// ppc: derived from GetOrphanRoot method
+//
+// This function is safe for concurrent access.
+func (b *BlockChain) PPCGetOrphanRoot(block *btcutil.Block) *btcutil.Block {
+	// Protect concurrent access.  Using a read lock only so multiple
+	// readers can query without blocking each other.
+	b.orphanLock.RLock()
+	defer b.orphanLock.RUnlock()
+
+	// Keep looping while the parent of each orphaned block is
+	// known and is an orphan itself.
+	orphanRoot := block
+	prevHash, _ := block.Sha()
+	for {
+		orphan, exists := b.orphans[*prevHash]
+		if !exists {
+			break
+		}
+		orphanRoot = orphan.block
+		prevHash = &orphan.block.MsgBlock().Header.PrevBlock
+	}
+
+	return orphanRoot
+}
+
+// PPCWantedByOrphan
+// ppc: find block wanted by given orphan block
+//
+// This function is safe for concurrent access.
+func (b *BlockChain) PPCWantedByOrphan(orphanBlock *btcutil.Block) *btcwire.ShaHash {
+	// Protect concurrent access.  Using a read lock only so multiple
+	// readers can query without blocking each other.
+	b.orphanLock.RLock()
+	defer b.orphanLock.RUnlock()
+
+	// Work back to the first block in the orphan chain
+	rootBlock := b.PPCGetOrphanRoot(orphanBlock)
+
+	return &rootBlock.MsgBlock().Header.PrevBlock
+}
+
 func (b *BlockChain) ppcProcessBlock(block *btcutil.Block, phase processPhase) error {
 	switch phase {
 	case phasePreSanity:
@@ -732,12 +769,51 @@ func (b *BlockChain) ppcProcessBlock(block *btcutil.Block, phase processPhase) e
 				return err
 			}
 			stake := getProofOfStakeFromBlock(block)
-			_, seen := stakeSeen[stake]
-			childs, hasChild := b.prevOrphans[*sha]
-			hasChild = hasChild && (len(childs) > 0)
-			if seen && !hasChild {
-				str := fmt.Sprintf("duplicate proof-of-stake (%v) for orphan block %s", stake, sha)
-				return ruleError(ErrDuplicateStake, str)
+
+			if b.bestChain.isProofOfStake() && stake.OutPoint.Hash.IsEqual(&b.bestChain.meta.PrevoutStake.OutPoint.Hash) {
+
+				// The best block's stake is reused, we cancel the best block
+
+				//if !pblock->CheckBlockSignature() {
+				//    return state.DoS(100, error("ProcessBlock() : Invalid signature in duplicate block"))
+				//}
+				// Only reject the best block if the duplicate is correctly signed
+				if !CheckBlockSignature(block.MsgBlock(), b.netParams) {
+					str := "ProcessBlock() : Invalid signature in duplicate block"
+					return ruleError(ErrBadBlockSignature, str)
+				}
+
+				log.Debugf("ProcessBlock() : block uses the same stake as the best block. Canceling the best block\n")
+
+				// Relay the duplicate block so that other nodes are aware of the duplication
+				//RelayBlock(*pblock, hash);
+				b.sendNotification(NTBlockAccepted, block)
+
+				// Cancel the best block
+				/*InvalidBlockFound(pindexBest)
+				  CValidationState stateDummy
+				  if !SetBestChain(stateDummy, pindexBest->pprev) {
+				      return error("ProcessBlock(): SetBestChain on previous best block failed")
+				  }*/
+				block, err := b.db.FetchBlockBySha(b.bestChain.hash)
+				if err != nil {
+					return err
+				}
+				err = b.disconnectBlock(b.bestChain, block)
+				if err != nil {
+					return err
+				}
+
+			} else {
+
+				_, seen := stakeSeen[stake]
+				childs, hasChild := b.prevOrphans[*sha]
+				hasChild = hasChild && (len(childs) > 0)
+				if seen && !hasChild {
+					str := fmt.Sprintf("duplicate proof-of-stake (%v) for orphan block %s", stake, sha)
+					return ruleError(ErrDuplicateStake, str)
+				}
+
 			}
 		}
 	}

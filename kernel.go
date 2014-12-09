@@ -751,8 +751,11 @@ func (b *BlockChain) checkBlockProofOfStake(block *btcutil.Block, timeSource Med
 			return err
 		}
 
-		setProofOfStake(block.Meta(), true) // Important: flags
-		block.Meta().HashProofOfStake = *hashProofOfStake
+		meta := block.Meta()
+		setProofOfStake(meta, true) // Important: flags
+		meta.HashProofOfStake = *hashProofOfStake
+		meta.PrevoutStake = getProofOfStakeFromBlock(block)
+
 		log.Debugf("Proof of stake for block %v = %v", blockHash, hashProofOfStake)
 
 	}
