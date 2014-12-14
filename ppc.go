@@ -172,9 +172,9 @@ func (b *BlockChain) ppcCalcNextRequiredDifficulty(lastNode *blockNode, proofOfS
 // rules.
 //
 // This function is NOT safe for concurrent access.
-/*func (b *BlockChain) PPCCalcNextRequiredDifficulty(proofOfStake bool) (uint32, error) {
+func (b *BlockChain) PPCCalcNextRequiredDifficulty(proofOfStake bool) (uint32, error) {
 	return b.ppcCalcNextRequiredDifficulty(b.bestChain, proofOfStake)
-}*/
+}
 
 // SetCoinbaseMaturity sets required coinbase maturity and return old one
 // Required for tests
