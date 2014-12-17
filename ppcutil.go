@@ -7,7 +7,6 @@ package btcchain
 import (
 	"encoding/binary"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"math/big"
 	"time"
@@ -31,52 +30,6 @@ const (
 	nProtocolV04UpgradeTime int64 = 0
 )
 
-// AddToBlockIndex processes all ppcoin specific block meta data
-func (b *BlockChain) AddToBlockIndex(block *btcutil.Block) (err error) {
-
-	defer timeTrack(now(), fmt.Sprintf("AddToBlockIndex(%v)", slice(block.Sha())[0]))
-
-	meta := block.Meta()
-
-	// ppcoin: compute stake entropy bit for stake modifier
-	stakeEntropyBit, err := getStakeEntropyBit(b, block)
-	if err != nil {
-		err = errors.New("AddToBlockIndex() : GetStakeEntropyBit() failed")
-		return
-	}
-	SetStakeEntropyBit(meta, stakeEntropyBit)
-
-	// ppcoin: compute stake modifier
-	var nStakeModifier uint64 = 0
-	var fGeneratedStakeModifier bool = false
-	nStakeModifier, fGeneratedStakeModifier, err =
-		b.ComputeNextStakeModifier(block)
-	if err != nil {
-		err = fmt.Errorf("AddToBlockIndex() : ComputeNextStakeModifier() failed %v", err)
-		return
-	}
-
-	meta.StakeModifier = nStakeModifier
-	SetGeneratedStakeModifier(meta, fGeneratedStakeModifier)
-
-	meta.StakeModifierChecksum, err = b.GetStakeModifierChecksum(block)
-
-	log.Debugf("AddToBlockIndex() : height=%d, modifier=%v, checksum=%v",
-		block.Height(), getStakeModifierHexString(meta.StakeModifier),
-		getStakeModifierCSHexString(meta.StakeModifierChecksum))
-
-	if err != nil {
-		err = errors.New("AddToBlockIndex() : GetStakeModifierChecksum() failed")
-		return
-	}
-	if !b.CheckStakeModifierCheckpoints(block.Height(), meta.StakeModifierChecksum) {
-		err = fmt.Errorf("AddToBlockIndex() : Rejected by stake modifier checkpoint height=%d, modifier=%d", block.Height(), meta.StakeModifier)
-		return
-	}
-
-	return nil
-}
-
 func getBlockTrust(block *btcutil.Block) *big.Int {
 	return CalcTrust(block.MsgBlock().Header.Bits, block.MsgBlock().IsProofOfStake())
 }
@@ -86,7 +39,7 @@ func getStakeEntropyBit(b *BlockChain, block *btcutil.Block) (uint32, error) {
 
 	defer timeTrack(now(), fmt.Sprintf("getStakeEntropyBit(%v)", slice(block.Sha())[0]))
 
-	var nEntropyBit uint32 = 0
+	nEntropyBit := uint32(0)
 	hash, _ := block.Sha()
 
 	if isProtocolV04(b, int64(block.MsgBlock().Header.Timestamp.Unix())) {
@@ -182,10 +135,6 @@ func minInt64(a int64, b int64) int64 {
 		return a
 	}
 	return b
-}
-
-func getAdjustedTime() int64 {
-	return time.Now().Unix() // TODO differs from ppcoin, probably already exists in btcd
 }
 
 func now() time.Time {

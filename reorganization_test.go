@@ -63,9 +63,10 @@ func TestReorganization(t *testing.T) {
 		chain.SetCoinbaseMaturity(originalMaturity)
 	}()
 
+	timeSource := btcchain.NewMedianTime()
 	expectedOrphans := map[int]struct{}{5: struct{}{}, 6: struct{}{}}
 	for i := 1; i < len(blocks); i++ {
-		isOrphan, err := chain.ProcessBlock(blocks[i], btcchain.BFNone)
+		isOrphan, err := chain.ProcessBlock(blocks[i], timeSource, btcchain.BFNone)
 		if err != nil {
 			t.Errorf("ProcessBlock fail on block %v: %v\n", i, err)
 			return

@@ -12,6 +12,7 @@ interface.  The functions are only exported while the tests are being run.
 package btcchain
 
 import (
+	"sort"
 	"time"
 
 	"github.com/mably/btcutil"
@@ -28,7 +29,7 @@ func TstSetCoinbaseMaturity(maturity int64) {
 
 // TstTimeSorter makes the internal timeSorter type available to the test
 // package.
-func TstTimeSorter(times []time.Time) timeSorter {
+func TstTimeSorter(times []time.Time) sort.Interface {
 	return timeSorter(times)
 }
 
@@ -36,4 +37,10 @@ func TstTimeSorter(times []time.Time) timeSorter {
 // available to the test package.
 func TstCheckSerializedHeight(coinbaseTx *btcutil.Tx, wantHeight int64) error {
 	return checkSerializedHeight(coinbaseTx, wantHeight)
+}
+
+// TstSetMaxMedianTimeEntries makes the ability to set the maximum number of
+// median tiem entries available to the test package.
+func TstSetMaxMedianTimeEntries(val int) {
+	maxMedianTimeEntries = val
 }

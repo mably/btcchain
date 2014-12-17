@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/mably/btcutil"
+	"github.com/mably/btcwire"
 )
 
 // maybeAcceptBlock potentially accepts a block into the memory block chain.
@@ -19,7 +20,7 @@ import (
 //  - BFFastAdd: The somewhat expensive BIP0034 validation is not performed.
 //  - BFDryRun: The memory chain index will not be pruned and no accept
 //    notification will be sent since the block is not being accepted.
-func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, flags BehaviorFlags) error {
+func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, timeSource MedianTimeSource, flags BehaviorFlags) error {
 
 	defer timeTrack(now(), fmt.Sprintf("maybeAcceptBlock(%v)", slice(block.Sha())[0]))
 
@@ -109,7 +110,7 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, flags BehaviorFlags)
 		return ruleError(ErrForkTooOld, str)
 	}
 
-	if !fastAdd {
+	if !fastAdd && b.netParams.Net != btcwire.TestNet3 {
 		// Reject version 1 blocks once a majority of the network has
 		// upgraded.  This is part of BIP0034.
 		if blockHeader.Version < 2 {
@@ -144,6 +145,21 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, flags BehaviorFlags)
 				}
 			}
 		}
+	}
+
+	// ppc: verify hash target and signature of coinstake tx
+	// TODO(mably) is it the best place to do that?
+	// TODO(mably) a timeSource param is needed to get the AdjustedTime
+	err = b.checkBlockProofOfStake(block, timeSource)
+	if err != nil {
+		str := fmt.Sprintf("Proof of stake check failed for block %v : %v", blockHash, err)
+		return ruleError(ErrProofOfStakeCheck, str)
+	}
+
+	// ppc: populate all ppcoin specific block meta data
+	err = b.AddToBlockIndex(block)
+	if err != nil {
+		return err
 	}
 
 	// Prune block nodes which are no longer needed before creating
