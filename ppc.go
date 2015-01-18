@@ -6,13 +6,14 @@ package btcchain
 
 import (
 	"fmt"
-	"github.com/conformal/btcec"
+	"math/big"
+
+	"github.com/btcsuite/btcec"
 	"github.com/mably/btcdb"
 	"github.com/mably/btcnet"
 	"github.com/mably/btcscript"
 	"github.com/mably/btcutil"
 	"github.com/mably/btcwire"
-	"math/big"
 )
 
 // Peercoin

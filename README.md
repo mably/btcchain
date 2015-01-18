@@ -77,20 +77,20 @@ is by no means exhaustive:
 ## Examples
 
 * [ProcessBlock Example]
-  (http://godoc.org/github.com/conformal/btcchain#example-BlockChain-ProcessBlock)  
+  (http://godoc.org/github.com/btcsuite/btcchain#example-BlockChain-ProcessBlock)  
   Demonstrates how to create a new chain instance and use ProcessBlock to
   attempt to attempt add a block to the chain.  This example intentionally
   attempts to insert a duplicate genesis block to illustrate how an invalid
   block is handled.
 
 * [CompactToBig Example]
-  (http://godoc.org/github.com/conformal/btcchain#example-CompactToBig)  
+  (http://godoc.org/github.com/btcsuite/btcchain#example-CompactToBig)  
   Demonstrates how to convert the compact "bits" in a block header which
   represent the target difficulty to a big integer and display it using the
   typical hex notation.
 
 * [BigToCompact Example]
-  (http://godoc.org/github.com/conformal/btcchain#example-BigToCompact)  
+  (http://godoc.org/github.com/btcsuite/btcchain#example-BigToCompact)  
   Demonstrates how to convert how to convert a target difficulty into the
   compact "bits" in a block header which represent that target difficulty.
 

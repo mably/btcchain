@@ -5,7 +5,7 @@ import (
 
 	"compress/bzip2"
 	"encoding/binary"
-	"github.com/conformal/btclog"
+	"github.com/btcsuite/btclog"
 	"github.com/mably/btcchain"
 	"github.com/mably/btcdb"
 	_ "github.com/mably/btcdb/memdb"
