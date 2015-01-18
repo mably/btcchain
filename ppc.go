@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/conformal/btcec"
+	"github.com/btcsuite/btcec"
 	"github.com/mably/btcdb"
 	"github.com/mably/btcnet"
 	"github.com/mably/btcscript"
